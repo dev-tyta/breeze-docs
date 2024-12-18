@@ -269,7 +269,7 @@ def main():
     """
     Example usage of CodeAnalyzer
     """
-    analyzer = CodeAnalyzer('/home/testys/Documents/GitHub/Breeze.ai')
+    analyzer = CodeAnalyzer('/home/testys/Documents/GitHub/taoAI-chatbot')
     analyzer.scan_repo()
     analyzer.save_repo_metadata()
 
