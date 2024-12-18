@@ -1,0 +1,101 @@
+[
+    {
+        "root_path": "/home/testys/Documents/GitHub/Breeze.ai",
+        "files": [
+            "main.py",
+            "README.md",
+            "db_setup.py",
+            "__init__.py",
+            "code_analysis.py",
+            "__init__.py",
+            "__init__.py",
+            "__init__.py",
+            "__init__.py"
+        ],
+        "directories": [
+            "examples",
+            "docs",
+            "src",
+            "src/code_parser",
+            "src/utils",
+            "src/prompt_generator",
+            "src/llm_interface",
+            "src/doc_formatter"
+        ],
+        "total_files": 9,
+        "metadata": [
+            {
+                "path": "main.py",
+                "name": "main.py",
+                "extension": ".py",
+                "size": 0,
+                "language": "python",
+                "last_modified": "2024-12-17T15:30:33.899794"
+            },
+            {
+                "path": "README.md",
+                "name": "README.md",
+                "extension": ".md",
+                "size": 0,
+                "language": "markdown",
+                "last_modified": "2024-12-18T08:54:43.206122"
+            },
+            {
+                "path": "db_setup.py",
+                "name": "db_setup.py",
+                "extension": ".py",
+                "size": 0,
+                "language": "python",
+                "last_modified": "2024-12-17T15:30:47.765845"
+            },
+            {
+                "path": "src/code_parser/__init__.py",
+                "name": "__init__.py",
+                "extension": ".py",
+                "size": 0,
+                "language": "python",
+                "last_modified": "2024-12-18T08:50:57.653962"
+            },
+            {
+                "path": "src/code_parser/code_analysis.py",
+                "name": "code_analysis.py",
+                "extension": ".py",
+                "size": 9331,
+                "language": "python",
+                "last_modified": "2024-12-18T11:53:09.310691"
+            },
+            {
+                "path": "src/utils/__init__.py",
+                "name": "__init__.py",
+                "extension": ".py",
+                "size": 0,
+                "language": "python",
+                "last_modified": "2024-12-18T08:53:30.293599"
+            },
+            {
+                "path": "src/prompt_generator/__init__.py",
+                "name": "__init__.py",
+                "extension": ".py",
+                "size": 0,
+                "language": "python",
+                "last_modified": "2024-12-18T08:51:43.267142"
+            },
+            {
+                "path": "src/llm_interface/__init__.py",
+                "name": "__init__.py",
+                "extension": ".py",
+                "size": 0,
+                "language": "python",
+                "last_modified": "2024-12-18T08:53:17.300099"
+            },
+            {
+                "path": "src/doc_formatter/__init__.py",
+                "name": "__init__.py",
+                "extension": ".py",
+                "size": 0,
+                "language": "python",
+                "last_modified": "2024-12-18T08:53:08.031736"
+            }
+        ]
+    }
+]

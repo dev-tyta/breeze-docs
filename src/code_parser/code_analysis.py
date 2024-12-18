@@ -13,6 +13,7 @@ import logging
 import json 
 import importlib.util as iutil
 import fnmatch
+from datetime import datetime
 
 
 # class for analysing code files in a directory
@@ -175,6 +176,7 @@ class CodeAnalyzer:
                 True if the path should be ignored, False otherwise.
         """
 
+
         return any(fnmatch.fnmatch(path, pattern) for pattern in self.ignore_patterns)
 
 
@@ -207,7 +209,7 @@ class CodeAnalyzer:
             "extension": file_ext,
             "size": os.path.getsize(file_path),
             "language": self._detect_language(file_path),
-            "last_modified": os.path.getmtime(file_path)
+            "last_modified": datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
         }
 
         # Add language-specific parsing for additional metadata
@@ -266,7 +268,7 @@ def main():
     """
     Example usage of CodeAnalyzer
     """
-    analyzer = CodeAnalyzer('/home/testys/Documents/ANNA-AI')
+    analyzer = CodeAnalyzer('/home/testys/Documents/GitHub/Breeze.ai')
     analyzer.scan_repo()
     analyzer.save_repo_metadata()
 
