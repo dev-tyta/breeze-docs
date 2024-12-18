@@ -14,7 +14,7 @@ import json
 import importlib.util as iutil
 import fnmatch
 from datetime import datetime
-
+from concurrent.futures import ThreadPoolExecutor
 
 # class for analysing code files in a directory
 class CodeAnalyzer:
@@ -131,31 +131,32 @@ class CodeAnalyzer:
             "metadata": []
         }
 
-        for root, dirs, files in os.walk(directory):
+        with ThreadPoolExecutor() as executor:
+            futures = []
+            for root, dirs, files in os.walk(directory):
+                dirs[:] = [d for d in dirs if not self._should_ignore(d)]
+                self.logger.info(f"Scanning directory: {root}")
 
-            dirs[:] = [d for d in dirs if not self._should_ignore(d)]
-            self.logger.info(f"Scanning directory: {root}")
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    self.logger.info(f"Scanning file: {full_path}")
+                    if not self._should_ignore(file):
+                        futures.append(executor.submit(self._extract_file_metadata, full_path))
 
-            for file in files:
-                full_path = os.path.join(root, file)
-                self.logger.info(f"Scanning file: {full_path}")
+                relative_path = os.path.relpath(root, directory)
+                if relative_path != ".":
+                    repository_structure["directories"].append(relative_path)
 
-                if not self._should_ignore(file):
-                    file_metadata = self._extract_file_metadata(full_path)
-                    if file_metadata:
-                        self.logger.info(f"Found code file: {file_metadata['name']}")
-                        repository_structure["files"].append(file_metadata["name"])
-                        repository_structure["metadata"].append(file_metadata)
-
-
-            
-            relative_path = os.path.relpath(root, directory)
-            if relative_path != ".":
-                repository_structure["directories"].append(relative_path)
+            for future in futures:
+                file_metadata = future.result()
+                if file_metadata:
+                    self.logger.info(f"Found code file: {file_metadata['name']}")
+                    repository_structure["files"].append(file_metadata["name"])
+                    repository_structure["metadata"].append(file_metadata)
 
         repository_structure["total_files"] = len(repository_structure["files"])
-        
         self.logger.info(f"Total files found: {repository_structure['total_files']}")
+
         
         return repository_structure
     
