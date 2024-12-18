@@ -2,6 +2,10 @@
 #TODO:Implement file filtering based on file extensions or patterns.
 #TODO:Implement directory exclusion based on a predefined ignore list or `.gitignore` configuration.
 #TODO:Store details about each valid file, including path, size, and language.
+#Recursive directory traversal: implemented in _scan_directory using os.walk
+#File filtering: implemented in _extract_file_metadata using file extension checks
+#Directory exclusion: implemented in _should_ignore using fnmatch patterns
+#File details storage: implemented in file_details list and _extract_file_metadata
 
 import os
 from typing import List, Tuple, Dict, Any
@@ -11,6 +15,7 @@ import importlib.util as iutil
 import fnmatch
 
 
+# class for analysing code files in a directory
 class CodeAnalyzer:
     """
     Code analysis class to analyze code files in a directory.
@@ -66,6 +71,7 @@ class CodeAnalyzer:
         ]
     
 
+    # initialize the code analyzer
     def __init__(self, root_dir: str, file_extensions: List[str] = None, ignore_patterns: List[str] = None):
         """
         Initialize the code analyzer.
@@ -89,6 +95,7 @@ class CodeAnalyzer:
         self.logger.propagate = False
 
     
+    # function to scan the repository
     def scan_repo(self) -> List[Dict[str, Any]]:
         """
         Scan the repository for code files.
@@ -105,6 +112,7 @@ class CodeAnalyzer:
         return self.file_details.append(repo_structure)
     
     
+    # function to scan a directory for code files
     def _scan_directory(self, directory: str) -> None:
         """
         Recursively scan the directory for code files and make use of concurrent processing.
@@ -125,15 +133,17 @@ class CodeAnalyzer:
         for root, dirs, files in os.walk(directory):
 
             dirs[:] = [d for d in dirs if not self._should_ignore(d)]
+            self.logger.info(f"Scanning directory: {root}")
 
             for file in files:
                 full_path = os.path.join(root, file)
+                self.logger.info(f"Scanning file: {full_path}")
 
                 if not self._should_ignore(file):
                     file_metadata = self._extract_file_metadata(full_path)
                     if file_metadata:
+                        self.logger.info(f"Found code file: {file_metadata['name']}")
                         repository_structure["files"].append(file_metadata["name"])
-                        
                         repository_structure["metadata"].append(file_metadata)
 
 
@@ -144,9 +154,12 @@ class CodeAnalyzer:
 
         repository_structure["total_files"] = len(repository_structure["files"])
         
+        self.logger.info(f"Total files found: {repository_structure['total_files']}")
+        
         return repository_structure
     
     
+    # function to check if a path should be ignored
     def _should_ignore(self, path: str) -> bool:
         """
         Check if the path should be ignored based on the ignore patterns.
@@ -165,6 +178,7 @@ class CodeAnalyzer:
         return any(fnmatch.fnmatch(path, pattern) for pattern in self.ignore_patterns)
 
 
+    # function to extract metadata from a code file
     def _extract_file_metadata(self, file_path: str) -> Dict[str, Any]:
         """
         Extract metadata from a code file.
@@ -179,6 +193,9 @@ class CodeAnalyzer:
             Dict[str, Any]
                 The file metadata.
         """
+
+        self.logger.info(f"Extracting metadata for file: {file_path}")
+
         file_name = os.path.basename(file_path)
         file_ext = os.path.splitext(file_name)[1]
         if file_ext not in self.file_extensions:
@@ -198,9 +215,12 @@ class CodeAnalyzer:
         if parser_method:
             file_metadata.update(parser_method(file_path))
 
+        self.logger.info(f"Metadata extracted: {file_metadata}")
+
         return file_metadata
 
 
+    # function to detect the programming language of a code file
     def _detect_language(self, file_path: str) -> str:
         """
         Detect the programming language of a code file.
@@ -215,9 +235,11 @@ class CodeAnalyzer:
             str
                 The detected language.
         """
+
         return self.DEFAULT_FILE_EXTENSIONS.get(os.path.splitext(file_path)[1], "unknown")
     
 
+    # Function to save the repository metadata to a JSON file
     def save_repo_metadata(self, output_path: str=None):
         """
         Save the repository metadata to a JSON file.
@@ -231,7 +253,10 @@ class CodeAnalyzer:
         --------
             None
         """
+
         output_path = output_path or os.path.join(self.root_dir, "repo_metadata.json")
+
+        self.logger.info(f"Saving repository metadata to: {output_path}")
 
         with open(output_path, "w") as f:
             json.dump(self.file_details, f, indent=4)
