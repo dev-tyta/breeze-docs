@@ -263,15 +263,3 @@ class CodeAnalyzer:
 
         with open(output_path, "w") as f:
             json.dump(self.file_details, f, indent=4)
-
-
-def main():
-    """
-    Example usage of CodeAnalyzer
-    """
-    analyzer = CodeAnalyzer('/home/testys/Documents/GitHub/taoAI-chatbot')
-    analyzer.scan_repo()
-    analyzer.save_repo_metadata()
-
-if __name__ == '__main__':
-    main()
