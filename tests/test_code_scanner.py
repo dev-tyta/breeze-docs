@@ -1,4 +1,5 @@
 #TODO: Add tests for code_scanner.py
+# Added tests for code_scanner.py
 
 import sys
 from pathlib import Path
