@@ -25,8 +25,9 @@ class BreeLLM(BaseLLM):
     
     def _call_llm(self):
         self.llm = AnthropicLLM(name="claude-3-5-sonnet-20240620", anthropic_api_key=self.claude_api_key)
+        self.chain = self.prompt | self.llm | self.output
 
 
-    def _prompt_llm(self):
-        chain = self.prompt | self.llm | self.output
-        output = chain.invoke({})
+    def _prompt_llm(self, query):
+        output = self.chain.invoke({"message": query})
+        print(output)
