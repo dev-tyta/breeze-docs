@@ -6,7 +6,7 @@ import logging
 
 
 # Add parent directory to system path to resolve imports
-parent_dir = "/home/testys/Documents/GitHub/breeze_docs"
+parent_dir = "/home/testys/Documents/GitHub(/breeze_docs"
 sys.path.append(str(parent_dir))
 
 from src.code_parser.ast_parser.core.base_parser import BaseParser
