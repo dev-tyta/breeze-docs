@@ -1,6 +1,6 @@
 from typing import List, Dict, Optional, Any
 import os
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator, root_validator
 
 
 class ElementParser(BaseModel):
@@ -45,13 +45,15 @@ class ModuleParser(BaseModel):
 
     @root_validator
     def validate_file_path(cls, values):
-        if not os.exists(values.get('file_path')):
+        if not os.path.exists(values.get('file_path')):  # Fixed exists check
             raise ValueError(f"File path {values.get('file_path')} does not exist")
         return values
-        
-    @root_validator
-    def validate_name(cls, values):
-        if not values.get('name'):
-            raise ValueError("Module name cannot be empty")
-        return values
     
+    @root_validator
+    def validate_line_numbers(cls, values):
+        """Add validation for line numbers in elements"""
+        for element_list in [values.get('functions', []), values.get('classes', [])]:
+            for element in element_list:
+                if element.start_line >= element.end_line:
+                    raise ValueError(f"Invalid line numbers for {element.name}: start_line must be less than end_line")
+        return values
