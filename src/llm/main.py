@@ -2,11 +2,9 @@
 #TODO: Make sure the LLM receives prompts structure and output structure in Pydantic Format (Refer to the Langchain Documentation for help)
 
 import os
-from langchain_anthropic import ChatAnthropic
 from langchain_openai.llms import OpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
-# from langchain_core.language_models.llms import BaseLLM
 from dotenv import load_dotenv
 import logging
 from pydantic import BaseModel
@@ -25,7 +23,7 @@ class BreeLLM:
     Parameters:
         
     """
-    def __init__(self, input_prompt, query, output_struct, tools):
+    def __init__(self, input_prompt, query, output_struct, tools=None):
         """
         Initialize the BreeLLM class.
 
@@ -41,28 +39,26 @@ class BreeLLM:
         self.query = query
         self.input_prompt = input_prompt
         self.output = PydanticOutputParser(output_struct)
-        self.prompt = PromptTemplate(
-            template=self.input_prompt,
-            input_variables=["query"],
-            output_parser=self.output
-        )
+        self.prompt = PromptTemplate.from_template(input_prompt)
         self.tools = tools
-        self.claude_api_key = os.getenv("CLAUDE_API_KEY")
-        logging.info(f"CLAUDE API Keys Loaded: {self.claude_api_key}")
+        self.llm = None
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         logging.info(f"OPENAI API Keys Loaded: {self.openai_api_key}")
         self.chain = None
 
-    def _call_llm(self):
-        logging.info("Setting up the LLM connection")
-        # self.llm = ChatAnthropic(name="claude-3-5-sonnet-20240620", anthropic_api_key=self.claude_api_key)
-        self.llm = OpenAI(api_key=self.openai_api_key)
-        logging.info("LLM connection setup")
-        self.chain = self.llm(self.prompt.format(query=self.query))
-        logging.info("Langchain Connection Setup")
+    def call_llm(self):
+        try:
+            logging.info("Setting up the LLM connection")
+            self.llm = OpenAI(api_key=self.openai_api_key)
+            self.chain = self.prompt | self.llm | self.output_parser
+            logging.info("Langchain Connection Setup")
+        except Exception as e:
+            logging.error(f"Failed to initialize LLM: {str(e)}")
+            raise
 
-    def _prompt_llm(self):
+    def prompt_llm(self):
         if not self.chain:
+            logging.info("Trying to call LLM")
             self._call_llm()
         logging.info("Invoking the LLM")
         output = self.chain.invoke({"message": self.prompt.format(query=self.query)})
@@ -74,8 +70,16 @@ class BreeLLM:
 class OutputModel(BaseModel):
     result: str
 
-# Usage Example
-# Define the input prompt, query, and expected output structure
-llm = BreeLLM(input_prompt="Generate a sonnet from the following text: {query}", query="The quick brown fox jumps over the lazy dog", output_struct=OutputModel, tools=None)
-output = llm._prompt_llm()
-print(output)
+if __name__ == "__main__":
+    try:
+        llm = BreeLLM(
+            input_prompt="Generate a sonnet from the following text: {query}", 
+            query="The quick brown fox jumps over the lazy dog",
+            output_struct=OutputModel,
+            tools=None
+        )
+        logging.info("Sending Inference to LLM")
+        output = llm.prompt_llm()
+        print(output)
+    except Exception as e:
+        logging.error(f"Error during execution: {str(e)}")

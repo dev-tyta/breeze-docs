@@ -8,7 +8,7 @@ import logging
 parent_dir = "/home/testys/Documents/GitHub/breeze_docs"
 sys.path.append(str(parent_dir))
 
-from src.llm.core import BreeLLM
+from src.llm.main import BreeLLM
 from llm.internals.parser_structure import ModuleParser
 
 
@@ -51,6 +51,8 @@ class LLMCodeParser:
                              ".jl": "julia"}
     
     def __init__(self, file_path):
+        logging.basicConfig(level=logging.INFO)
+        logging.info("LLM Code Parser Initialized")
         self.file_path = file_path
         self.file_name = os.path.basename(file_path)
 

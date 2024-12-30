@@ -43,13 +43,13 @@ class ModuleParser(BaseModel):
     global_variables: List[Dict[str, Any]] = Field(default_factory=list)
     raw_content: Optional[str] = None
 
-    @root_validator
+    @model_validator(mode='before')
     def validate_file_path(cls, values):
         if not os.path.exists(values.get('file_path')):  # Fixed exists check
             raise ValueError(f"File path {values.get('file_path')} does not exist")
         return values
     
-    @root_validator
+    @model_validator(mode='before')
     def validate_line_numbers(cls, values):
         """Add validation for line numbers in elements"""
         for element_list in [values.get('functions', []), values.get('classes', [])]:
