@@ -8,7 +8,7 @@ import logging
 parent_dir = "/home/testys/Documents/GitHub/breeze_docs"
 sys.path.append(str(parent_dir))
 
-from src.llm.main import BreeLLM
+from llm.core import BreeLLM
 from llm.internals.parser_structure import ModuleParser
 
 
