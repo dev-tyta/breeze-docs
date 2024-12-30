@@ -1,85 +1,184 @@
-#TODO: Setup langchain connection to the LLM model: Should be able to send response and receive response from any part of the codebase.
-#TODO: Make sure the LLM receives prompts structure and output structure in Pydantic Format (Refer to the Langchain Documentation for help)
-
 import os
-from langchain_openai.llms import OpenAI
+import asyncio
+from typing import Optional, List, Union, Type, Any
+from anthropic import Anthropic
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.language_models.llms import BaseLLM
 from dotenv import load_dotenv
-import logging
-from pydantic import BaseModel
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+import sys
 
+
+parent_dir = "/home/testys/Documents/GitHub/breeze_docs"
+sys.path.append(str(parent_dir))
+
+
+from src.llm.config import LLMConfig
+from src.llm.exceptions import LLMError, ConfigurationError, APIError, ParseError
+from src.llm.utils import retry_with_backoff, validate_api_key, logger
 
 load_dotenv()
 
 
-class BreeLLM:
+class BreeLLM(BaseLLM, BaseModel):
     """
-    Main Class for Interacting with the Bree Language Model.
-
-    This class sets up a connection to the Bree Language Model (LLM) using the Langchain framework.
+    Enhanced LLM implementation with improved structure and error handling.
     
-    Parameters:
+    Attributes:
+        config (LLMConfig): Configuration settings for the LLM
+        client (Anthropic): Anthropic client instance
+        output_parser (Optional[PydanticOutputParser]): Parser for structured output
+    """
+    
+    config: Optional[LLMConfig] = Field(default_factory=LLMConfig)
+    query: str
+    input_prompt: str
+    output_parser: Optional[PydanticOutputParser] = None
+    client: Optional[Anthropic] = None
+    prompt: Optional[PromptTemplate] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def __init__(
+        self,
+        input_prompt: str,
+        query: str,
+        output_struct: Optional[Type[BaseModel]] = None,
+        config: Optional[LLMConfig] = None,
+        **kwargs
+    ):
+        """
+        Initialize the LLM with the given configuration.
         
-    """
-    def __init__(self, input_prompt, query, output_struct, tools=None):
+        Args:
+            input_prompt: Template for the prompt
+            query: The input query
+            output_struct: Optional Pydantic model for output parsing
+            config: Optional configuration override
         """
-        Initialize the BreeLLM class.
-
-        Parameters:
-        input_prompt (str): The prompt template to be used for the LLM.
-        self.output = PydanticOutputParser(model=output_struct)
-        output_struct (Type[PydanticModel]): The expected output structure in Pydantic format.
-        tools (Any): Additional tools or configurations for the LLM.
-        """
-        logging.basicConfig(level=logging.INFO)
-        logging.info("BreeLLM Initialized")
-        self.llm_type: str = "openai"
-        self.query = query
-        self.input_prompt = input_prompt
-        self.output = PydanticOutputParser(output_struct)
-        self.prompt = PromptTemplate.from_template(input_prompt)
-        self.tools = tools
-        self.llm = None
-        self.openai_api_key = os.getenv("OPENAI_API_KEY")
-        logging.info(f"OPENAI API Keys Loaded: {self.openai_api_key}")
-        self.chain = None
-
-    def call_llm(self):
-        try:
-            logging.info("Setting up the LLM connection")
-            self.llm = OpenAI(api_key=self.openai_api_key)
-            self.chain = self.prompt | self.llm | self.output_parser
-            logging.info("Langchain Connection Setup")
-        except Exception as e:
-            logging.error(f"Failed to initialize LLM: {str(e)}")
-            raise
-
-    def prompt_llm(self):
-        if not self.chain:
-            logging.info("Trying to call LLM")
-            self._call_llm()
-        logging.info("Invoking the LLM")
-        output = self.chain.invoke({"message": self.prompt.format(query=self.query)})
-        logging.info("LLM invoked")
-        return output
+        super().__init__(
+            input_prompt=input_prompt,
+            query=query,
+            config=config,
+            **kwargs
+        )
+        
+        # Setup output parsing if needed
+        if output_struct is not None:
+            if not issubclass(output_struct, BaseModel):
+                raise ConfigurationError("output_struct must be a Pydantic model")
+            self.output_parser = PydanticOutputParser(pydantic_object=output_struct)
+        
+        # Initialize prompt template
+        self._setup_prompt_template()
+        
+        # Initialize client
+        self._setup_client()
+        
+    def _setup_prompt_template(self):
+        """Setup the prompt template with format instructions if needed"""
+        format_instructions = ""
+        if self.output_parser:
+            format_instructions = self.output_parser.get_format_instructions()
+            
+        self.prompt = PromptTemplate(
+            template=self.input_prompt,
+            input_variables=["message"],
+            partial_variables={"format_instructions": format_instructions}
+        )
+        
+    def _setup_client(self):
+        """Setup the Anthropic client with validation"""
+        api_key = validate_api_key(os.getenv(self.config.api_key_env_var))
+        self.client = Anthropic(api_key=api_key)
     
+    @property
+    def _llm_type(self) -> str:
+        """Return identifier for the LLM type"""
+        return "anthropic"
+    
+    @retry_with_backoff(max_retries=3)
+    async def _generate(
+        self,
+        prompts: List[str],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[Any] = None,
+        **kwargs
+    ) -> List[str]:
+        """
+        Generate responses for the given prompts with retry logic.
+        
+        Args:
+            prompts: List of prompts to process
+            stop: Optional stop sequences
+            run_manager: Optional callback manager
+            **kwargs: Additional arguments
+            
+        Returns:
+            List of generated responses
+            
+        Raises:
+            APIError: If API call fails after retries
+            ParseError: If output parsing fails
+        """
+        try:
+            formatted_prompt = self.prompt.format(message=prompts[0])
+            response = await self.client.messages.create(
+                model=self.config.model_name,
+                max_tokens=self.config.max_tokens,
+                temperature=self.config.temperature,
+                messages=[{"role": "user", "content": formatted_prompt}]
+            )
+            
+            output = response.content[0].text
+            
+            # Parse output if parser is configured
+            if self.output_parser:
+                try:
+                    output = self.output_parser.parse(output)
+                except Exception as e:
+                    raise ParseError(f"Failed to parse output: {str(e)}")
+                    
+            return [output]
+            
+        except Exception as e:
+            logger.error(f"Error generating response: {str(e)}")
+            raise APIError(f"Failed to generate response: {str(e)}")
+            
+    async def generate_response(self, query: Optional[str] = None) -> str:
+        """
+        Convenience method for generating a single response.
+        
+        Args:
+            query: Optional query override
+            
+        Returns:
+            Generated response
+        """
+        query = query or self.query
+        responses = await self._generate([query])
+        return responses[0]
+    
+
 
 # Usage Example
-class OutputModel(BaseModel):
-    result: str
+class SonnetOutput(BaseModel):
+    title: str
+    lines: List[str]
 
-if __name__ == "__main__":
-    try:
-        llm = BreeLLM(
-            input_prompt="Generate a sonnet from the following text: {query}", 
-            query="The quick brown fox jumps over the lazy dog",
-            output_struct=OutputModel,
-            tools=None
-        )
-        logging.info("Sending Inference to LLM")
-        output = llm.prompt_llm()
-        print(output)
-    except Exception as e:
-        logging.error(f"Error during execution: {str(e)}")
+# Initialize LLM
+llm = BreeLLM(
+    input_prompt="Generate a sonnet from the following text: {message}",
+    query="The quick brown fox jumps over the lazy dog",
+    output_struct=SonnetOutput,  # Optional,
+    config=LLMConfig(model_name="claude-3-sonnet-20240229", max_tokens=512, temperature=0.7, api_key_env_var="CLAUDE_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
+)
+
+# Generate response
+async def main():
+    response = await llm.generate_response()
+    print(response)
+
+asyncio.run(main())
