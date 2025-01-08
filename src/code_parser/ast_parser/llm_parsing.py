@@ -89,7 +89,7 @@ class LLMCodeParser:
             logging.info(f"Prompt defined: {input_prompt}")
             self.model = BreeLLM(input_prompt=input_prompt, query="", output_struct=ModuleParser, tools=None)
             logging.info("Model initialized")
-            output = self.model._prompt_llm()
+            output = self.model.generate_response()
             logging.info(f"Model output: {output}")
             return ModuleParser(**output)
         except Exception as e:
