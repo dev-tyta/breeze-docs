@@ -1,17 +1,12 @@
 import os
 import asyncio
 from typing import Optional, List, Union, Type, Any
-from anthropic import Anthropic
+from langchain_openai import OpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.language_models.llms import BaseLLM
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-import sys
-
-
-parent_dir = "/home/testys/Documents/GitHub/breeze_docs"
-sys.path.append(str(parent_dir))
 
 
 from src.llm.config import LLMConfig
@@ -35,7 +30,7 @@ class BreeLLM(BaseLLM, BaseModel):
     query: str
     input_prompt: str
     output_parser: Optional[PydanticOutputParser] = None
-    client: Optional[Anthropic] = None
+    client: Optional[OpenAI] = None
     prompt: Optional[PromptTemplate] = None
 
     class Config:
@@ -90,14 +85,18 @@ class BreeLLM(BaseLLM, BaseModel):
         )
         
     def _setup_client(self):
-        """Setup the Anthropic client with validation"""
+        """Setup the OpenAI client with validation"""
         api_key = validate_api_key(os.getenv(self.config.api_key_env_var))
-        self.client = Anthropic(api_key=api_key)
+        self.llm = OpenAI(api_key=api_key, 
+                          model=self.config.model_name,
+                          max_tokens=self.config.max_tokens,
+                          temperature=self.config.temperature,
+                          timeout=self.config.timeout)
     
     @property
     def _llm_type(self) -> str:
         """Return identifier for the LLM type"""
-        return "anthropic"
+        return "openai"
     
     @retry_with_backoff(max_retries=3)
     async def _generate(
@@ -125,14 +124,9 @@ class BreeLLM(BaseLLM, BaseModel):
         """
         try:
             formatted_prompt = self.prompt.format(message=prompts[0])
-            response = await self.client.messages.create(
-                model=self.config.model_name,
-                max_tokens=self.config.max_tokens,
-                temperature=self.config.temperature,
-                messages=[{"role": "user", "content": formatted_prompt}]
-            )
+            chain = formatted_prompt | self.llm
             
-            output = response.content[0].text
+            output = chain.run()
             
             # Parse output if parser is configured
             if self.output_parser:
@@ -164,15 +158,16 @@ class BreeLLM(BaseLLM, BaseModel):
 
 
 # Usage Example
-class SonnetOutput(BaseModel):
-    title: str
-    lines: List[str]
+class SonnetResponse(BaseModel):
+    """Pydantic model for sonnet response"""
+    sonnet: str
+
 
 # Initialize LLM
 llm = BreeLLM(
     input_prompt="Generate a sonnet from the following text: {message}",
     query="The quick brown fox jumps over the lazy dog",
-    output_struct=SonnetOutput,  # Optional,
+    output_struct=SonnetResponse,  # Optional,
     config=LLMConfig(model_name="claude-3-sonnet-20240229", max_tokens=512, temperature=0.7, api_key_env_var="CLAUDE_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
 )
 
