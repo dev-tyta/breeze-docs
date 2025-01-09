@@ -16,7 +16,7 @@ from src.llm.utils import retry_with_backoff, validate_api_key, logger
 load_dotenv()
 
 
-class BreeLLM(BaseLLM, BaseModel):
+class BreeLLM(BaseLLM):
     """
     Enhanced LLM implementation with improved structure and error handling.
     
@@ -30,8 +30,8 @@ class BreeLLM(BaseLLM, BaseModel):
     query: str
     input_prompt: str
     output_parser: Optional[PydanticOutputParser] = None
-    client: Optional[OpenAI] = None
     prompt: Optional[PromptTemplate] = None
+    llm: Optional[Any] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -66,11 +66,14 @@ class BreeLLM(BaseLLM, BaseModel):
                 raise ConfigurationError("output_struct must be a Pydantic model")
             self.output_parser = PydanticOutputParser(pydantic_object=output_struct)
         
+        self.llm = None
         # Initialize prompt template
         self._setup_prompt_template()
         
         # Initialize client
         self._setup_client()
+        logger.info(f"Initialized {self._llm_type} LLM with model: {self.config.model_name}")
+
         
     def _setup_prompt_template(self):
         """Setup the prompt template with format instructions if needed"""
@@ -87,11 +90,13 @@ class BreeLLM(BaseLLM, BaseModel):
     def _setup_client(self):
         """Setup the OpenAI client with validation"""
         api_key = validate_api_key(os.getenv(self.config.api_key_env_var))
+        logger.info(f"Using API key: {api_key}")
         self.llm = OpenAI(api_key=api_key, 
                           model=self.config.model_name,
                           max_tokens=self.config.max_tokens,
                           temperature=self.config.temperature,
                           timeout=self.config.timeout)
+        
     
     @property
     def _llm_type(self) -> str:
@@ -124,9 +129,13 @@ class BreeLLM(BaseLLM, BaseModel):
         """
         try:
             formatted_prompt = self.prompt.format(message=prompts[0])
-            chain = formatted_prompt | self.llm
-            
-            output = chain.run()
+            logger.info(f"Generating response for prompt: {formatted_prompt}")
+
+            # Using Chain Method to generate response
+            response = self.llm.invoke(formatted_prompt)
+            logger.info(f"Response generated: {response}")
+
+            output = response["choices"][0]["text"]
             
             # Parse output if parser is configured
             if self.output_parser:
@@ -152,7 +161,9 @@ class BreeLLM(BaseLLM, BaseModel):
             Generated response
         """
         query = query or self.query
+        logger.info(f"Generating response for query: {query}")
         responses = await self._generate([query])
+        logger.info(f"Response generated: {responses[0]}")
         return responses[0]
     
 
@@ -168,7 +179,7 @@ llm = BreeLLM(
     input_prompt="Generate a sonnet from the following text: {message}",
     query="The quick brown fox jumps over the lazy dog",
     output_struct=SonnetResponse,  # Optional,
-    config=LLMConfig(model_name="claude-3-sonnet-20240229", max_tokens=512, temperature=0.7, api_key_env_var="CLAUDE_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
+    config=LLMConfig(model_name="gpt-3.5-turbo", max_tokens=512, temperature=0.7, api_key_env_var="OPENAI_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
 )
 
 # Generate response

@@ -162,9 +162,9 @@ class MultiLanguageParser:
 
 
 # Usage example
-parser = MultiLanguageParser()
-file_path = "/home/testys/Documents/GitHub/breeze_docs/src/code_parser/code_scanner.py"
-language = "python"
-result = parser.parse_file(file_path, language)
+# parser = MultiLanguageParser()
+# file_path = "/workspaces/breeze-docs/src/code_parser/code_scanner.py"
+# language = "python"
+# result = parser.parse_file(file_path, language)
 
-print(result)
+# print(result)
