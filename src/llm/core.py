@@ -2,6 +2,7 @@ import os
 import asyncio
 from typing import Optional, List, Union, Type, Any
 from langchain_openai import OpenAI
+from langchain_google_genai import GoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.language_models.llms import BaseLLM
@@ -91,17 +92,16 @@ class BreeLLM(BaseLLM):
         """Setup the OpenAI client with validation"""
         api_key = validate_api_key(os.getenv(self.config.api_key_env_var))
         logger.info(f"Using API key: {api_key}")
-        self.llm = OpenAI(api_key=api_key, 
-                          model=self.config.model_name,
-                          max_tokens=self.config.max_tokens,
-                          temperature=self.config.temperature,
-                          timeout=self.config.timeout)
-        
+        self.llm = GoogleGenerativeAI(api_key=api_key,
+                                      model=self.config.model_name,
+                                      max_tokens=self.config.max_tokens,
+                                      temperature=self.config.temperature,
+                                      timeout=self.config.timeout)
     
     @property
     def _llm_type(self) -> str:
         """Return identifier for the LLM type"""
-        return "openai"
+        return "gemini"
     
     @retry_with_backoff(max_retries=3)
     async def _generate(
@@ -135,7 +135,7 @@ class BreeLLM(BaseLLM):
             response = self.llm.invoke(formatted_prompt)
             logger.info(f"Response generated: {response}")
 
-            output = response["choices"][0]["text"]
+            output = response
             
             # Parse output if parser is configured
             if self.output_parser:
@@ -179,7 +179,7 @@ llm = BreeLLM(
     input_prompt="Generate a sonnet from the following text: {message}",
     query="The quick brown fox jumps over the lazy dog",
     output_struct=SonnetResponse,  # Optional,
-    config=LLMConfig(model_name="gpt-3.5-turbo", max_tokens=512, temperature=0.7, api_key_env_var="OPENAI_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
+    config=LLMConfig(model_name="gemini-1.5-flash", max_tokens=512, temperature=0.7, api_key_env_var="GOOGLE_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
 )
 
 # Generate response

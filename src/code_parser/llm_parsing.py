@@ -5,11 +5,8 @@ from typing import Dict, Any
 from pathlib import Path
 import logging
 
-parent_dir = "/home/testys/Documents/GitHub/breeze_docs"
-sys.path.append(str(parent_dir))
-
-from llm.core import BreeLLM
-from llm.internals.parser_structure import ModuleParser
+from src.llm.core import BreeLLM
+from src.llm.internals.parser_structure import ModuleParser
 
 
 class LLMCodeParser:
@@ -128,6 +125,6 @@ class LLMCodeParser:
     
     
 # Usage Example
-parser = LLMCodeParser(file_path="/home/testys/Documents/GitHub/breeze_docs/data/samples/sample_parsers/hello.java")
+parser = LLMCodeParser(file_path="/workspaces/breeze-docs/src/code_parser/ast_parser.py")
 out = parser.parse_file()
 print(out)
