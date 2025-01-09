@@ -1,0 +1,10 @@
+javalang
+pycparser
+esprima
+xmltodict
+anthropic
+langchain_core
+langchain_community
+langchain_openai
+langchain_anthropic
+pydantic

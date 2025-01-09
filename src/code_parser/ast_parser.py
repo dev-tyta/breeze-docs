@@ -12,8 +12,7 @@ import esprima  # For JavaScript/TypeScript
 import xmltodict  # For XML
 import yaml  # For YAML
 import json
-import subprocess
-import sys
+
 
 class MultiLanguageParser:
     def __init__(self):
