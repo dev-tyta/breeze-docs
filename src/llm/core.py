@@ -150,11 +150,11 @@ class BreeLLM(BaseLLM):
             formatted_prompt = self.prompt.format(message=prompts[0])
             logger.info(f"Generating response for prompt: {formatted_prompt}")
 
-            # Using Chain Method to generate response
+            
             response = self.llm.invoke(formatted_prompt)
             logger.info(f"Response generated: {response}")
 
-            response = await self.parse_output_to_json(response)
+            response = await self.parse_output_structure(response)
 
             return [response.data]
             
@@ -178,7 +178,7 @@ class BreeLLM(BaseLLM):
         responses = await self._generate([query])
         logger.info(f"Responses generated: {responses}")
         # logger.info(f"Response generated: {responses[0]}")
-        return responses[0]
+        return responses
 
 
     async def parse_output_structure(self, response:str) -> BaseModel:
@@ -204,29 +204,6 @@ class BreeLLM(BaseLLM):
         except Exception as e:
             logger.error(f"Error parsing output: {str(e)}")
             raise ParseError(f"Failed to parse output: {str(e)}")
-        
-    
-    async def parse_output_to_json(self, response: str) -> Dict:
-        """
-        Parse the output structure of the response to a JSON dictionary.
-        
-        Args:
-            response: The generated response
-            
-        Returns:
-            Parsed output structure as a JSON dictionary
-        """
-        if isinstance(response, BaseModel):
-            return response
-        else:
-            raise ValueError("Response is not a Pydantic model")
-
-
-
-    async def close(self):
-        """Close the client connection"""
-        await self.llm.close()
-        logger.info("Client connection closed")
     
 
 
@@ -234,6 +211,20 @@ class BreeLLM(BaseLLM):
 class SonnetResponse(BaseModel):
     """Pydantic model for sonnet response"""
     sonnet: str
+
+
+# Add after SonnetResponse class
+def save_to_json(response: SonnetResponse, filepath: str) -> None:
+    import json
+    
+    # Convert response to dictionary
+    response_dict = {
+        "sonnet": response[0].sonnet.replace('\\n', '\n')  # Fix newline characters
+    }
+    
+    # Save to JSON file
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(response_dict, f, indent=4, ensure_ascii=False)
 
 
 # Initialize LLM
@@ -247,6 +238,10 @@ llm = BreeLLM(
 # Generate response
 async def main():
     response = await llm.generate_response()
+    logger.info(f"Response: {response}")
     print(response)
+    
+    # Save to JSON file
+    save_to_json(response, "sonnet_output.json")
 
 asyncio.run(main())
