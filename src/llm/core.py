@@ -9,6 +9,7 @@ from langchain_core.language_models.llms import BaseLLM
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
+from pprint import pprint
 
 
 from src.llm.config import LLMConfig
@@ -156,7 +157,11 @@ class BreeLLM(BaseLLM):
 
             response = await self.parse_output_structure(response)
 
-            return [response.data]
+            logger.info(f"Response parsed: {response.data}")
+
+            response = self.struct_to_dict([response.data], self.output_parser)
+
+            return response
             
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
@@ -177,7 +182,7 @@ class BreeLLM(BaseLLM):
         logger.info(f"Generating response for query: {query}")
         responses = await self._generate([query])
         logger.info(f"Responses generated: {responses}")
-        # logger.info(f"Response generated: {responses[0]}")
+
         return responses
 
 
@@ -205,43 +210,47 @@ class BreeLLM(BaseLLM):
             logger.error(f"Error parsing output: {str(e)}")
             raise ParseError(f"Failed to parse output: {str(e)}")
     
+    def struct_to_dict(self, response:List,  structure: BaseModel) -> Dict[str, Any]:
+        """
+        Convert a structured output to a dictionary.
+        
+        Args:
+            response: The generated structured response
+            struct: The structured output
+            
+        Returns:
+            Dictionary representation of the output
+        """
+        dict_output = {}
+        list_of_keys = list(structure.model_fields.keys())
 
+        for i in list_of_keys:
+            output = response[0].__getattribute__(i)
+            dict_output.update({i: output})
+
+        return dict_output
+    
 
 # Usage Example
 class SonnetResponse(BaseModel):
     """Pydantic model for sonnet response"""
+    title: str
     sonnet: str
-
-
-# Add after SonnetResponse class
-def save_to_json(response: SonnetResponse, filepath: str) -> None:
-    import json
-    
-    # Convert response to dictionary
-    response_dict = {
-        "sonnet": response[0].sonnet.replace('\\n', '\n')  # Fix newline characters
-    }
-    
-    # Save to JSON file
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(response_dict, f, indent=4, ensure_ascii=False)
 
 
 # Initialize LLM
 llm = BreeLLM(
-    input_prompt="Generate a sonnet from the following text: {message}",
+    input_prompt="Generate a title and sonnet from the following text: {message}",
     query="The quick brown fox jumps over the lazy dog",
     output_struct=SonnetResponse,  # Optional,
     config=LLMConfig(model_name="gemini-1.5-flash", max_tokens=512, temperature=0.7, api_key_env_var="GEMINI_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
 )
 
-# Generate response
+# # Generate response
 async def main():
     response = await llm.generate_response()
     logger.info(f"Response: {response}")
     print(response)
-    
-    # Save to JSON file
-    save_to_json(response, "sonnet_output.json")
+
 
 asyncio.run(main())

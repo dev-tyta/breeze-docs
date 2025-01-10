@@ -8,6 +8,7 @@ import asyncio
 
 from src.llm.core import BreeLLM
 from src.llm.internals.parser_structure import ModuleParser
+from src.llm.config import LLMConfig
 
 
 class LLMCodeParser:
@@ -85,7 +86,18 @@ class LLMCodeParser:
         try:
             input_prompt = self._define_prompt(content=content)
             logging.info(f"Prompt defined: {input_prompt}")
-            self.model = BreeLLM(input_prompt=input_prompt, query="", output_struct=ModuleParser, tools=None)
+            self.model = BreeLLM(input_prompt=input_prompt,
+                                 query="",
+                                 output_struct=ModuleParser,
+                                 config=LLMConfig(model_name="gemini-1.5-flash",
+                                                  max_tokens=512,
+                                                  temperature=0.7,
+                                                  api_key_env_var="GEMINI_API_KEY",
+                                                  timeout=30,
+                                                  retry_attempts=3,
+                                                  retry_wait=1.0
+                                                  )
+                                            )
             logging.info("Model initialized")
 
             output = await self.model.generate_response()
@@ -97,7 +109,7 @@ class LLMCodeParser:
         
     
     def _parse_to_json(self, parsed:ModuleParser) -> Dict[str, Any]:
-        dict_output = parsed.dict()
+        dict_output = parsed
         logging.info(f"Output parsed to dictionary: {dict_output}")
         with open(f"./{os.path.splitext(self.file_name)[0]}.json", "w") as file:
             json.dump(dict_output, file)
