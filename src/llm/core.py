@@ -30,9 +30,9 @@ class BreeLLM(BaseLLM):
     config: Optional[LLMConfig] = Field(default_factory=LLMConfig)
     query: str
     input_prompt: str
-    output_parser: Optional[PydanticOutputParser] = None
+    output_parser: Optional[Type[BaseModel]] = None
     prompt: Optional[PromptTemplate] = None
-    llm: Optional[Any] = None
+    llm: Optional[GoogleGenerativeAI] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -65,9 +65,10 @@ class BreeLLM(BaseLLM):
         if output_struct is not None:
             if not issubclass(output_struct, BaseModel):
                 raise ConfigurationError("output_struct must be a Pydantic model")
-            self.output_parser = PydanticOutputParser(pydantic_object=output_struct)
+            self.output_parser = output_struct
         
-        self.llm = None
+        logger.info(f"Output parser configured: {self.output_parser}")
+
         # Initialize prompt template
         self._setup_prompt_template()
         
@@ -80,7 +81,7 @@ class BreeLLM(BaseLLM):
         """Setup the prompt template with format instructions if needed"""
         format_instructions = ""
         if self.output_parser:
-            format_instructions = self.output_parser.get_format_instructions()
+            format_instructions = self.output_parser
             
         self.prompt = PromptTemplate(
             template=self.input_prompt,
@@ -97,6 +98,8 @@ class BreeLLM(BaseLLM):
                                       max_tokens=self.config.max_tokens,
                                       temperature=self.config.temperature,
                                       timeout=self.config.timeout)
+        # self.llm = self.llm.with_structured_output(self.output_parser)
+        
     
     @property
     def _llm_type(self) -> str:
@@ -130,6 +133,7 @@ class BreeLLM(BaseLLM):
         try:
             formatted_prompt = self.prompt.format(message=prompts[0])
             logger.info(f"Generating response for prompt: {formatted_prompt}")
+            # self.llm = self.llm.with_structured_output(self.output_parser)
 
             # Using Chain Method to generate response
             response = self.llm.invoke(formatted_prompt)
@@ -140,7 +144,7 @@ class BreeLLM(BaseLLM):
             # Parse output if parser is configured
             if self.output_parser:
                 try:
-                    output = self.output_parser.parse(output)
+                    output = self.output_parser(output)
                 except Exception as e:
                     raise ParseError(f"Failed to parse output: {str(e)}")
                     
