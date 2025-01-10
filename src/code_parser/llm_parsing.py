@@ -4,6 +4,7 @@ import json
 from typing import Dict, Any
 from pathlib import Path
 import logging
+import asyncio
 
 from src.llm.core import BreeLLM
 from src.llm.internals.parser_structure import ModuleParser
@@ -80,13 +81,14 @@ class LLMCodeParser:
         return prompt
     
 
-    def parse(self, content:str) -> ModuleParser:
+    async def parse(self, content:str) -> ModuleParser:
         try:
             input_prompt = self._define_prompt(content=content)
             logging.info(f"Prompt defined: {input_prompt}")
             self.model = BreeLLM(input_prompt=input_prompt, query="", output_struct=ModuleParser, tools=None)
             logging.info("Model initialized")
-            output = self.model.generate_response()
+
+            output = await self.model.generate_response()
             logging.info(f"Model output: {output}")
             return ModuleParser(**output)
         except Exception as e:
@@ -102,29 +104,34 @@ class LLMCodeParser:
 
         return dict_output
     
-    def parse_file(self) -> ModuleParser:
+    async def parse_file(self) -> ModuleParser:
         with open(self.file_path, "r", encoding="utf-8") as file:
             content = file.read()
         
-        out_parse = self.parse(content)
+        out_parse = await self.parse(content)
         
         self._parse_to_json(out_parse)
 
         return out_parse
 
     
-    def parse_directory(self, directory_path:str) -> Dict[str, ModuleParser]:
+    async def parse_directory(self, directory_path:str) -> Dict[str, ModuleParser]:
         parsed_files = {}
         for root, _, files in os.walk(directory_path):
             for file in files:
                 if file.endswith(tuple(self.DEFAULT_FILE_EXTENSIONS.keys())):
                     file_path = os.path.join(root, file)
-                    parsed_files[file] = self.parse_file(file_path=file_path)
+                    parsed_files[file] = await self.parse_file(file_path=file_path)
         
         return parsed_files
     
     
 # Usage Example
 parser = LLMCodeParser(file_path="/workspaces/breeze-docs/src/code_parser/ast_parser.py")
-out = parser.parse_file()
-print(out)
+
+# Generate response
+async def main():
+    response = await parser.parse_file()
+    print(response)
+
+asyncio.run(main())

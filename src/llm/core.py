@@ -1,6 +1,6 @@
 import os
 import asyncio
-from typing import Optional, List, Union, Type, Any
+from typing import Optional, List, Union, Type, Any, Dict
 from langchain_openai import OpenAI
 from langchain_google_genai import GoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
@@ -8,6 +8,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.language_models.llms import BaseLLM
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+from pydantic_ai import Agent
 
 
 from src.llm.config import LLMConfig
@@ -30,9 +31,11 @@ class BreeLLM(BaseLLM):
     config: Optional[LLMConfig] = Field(default_factory=LLMConfig)
     query: str
     input_prompt: str
+    # output_parser: Optional[PydanticOutputParser] = None
     output_parser: Optional[Type[BaseModel]] = None
     prompt: Optional[PromptTemplate] = None
     llm: Optional[GoogleGenerativeAI] = None
+    agent: Optional[Any] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -61,17 +64,23 @@ class BreeLLM(BaseLLM):
             **kwargs
         )
         
+        logger.info(f"Before Parsing Output Struct: {output_struct}")
         # Setup output parsing if needed
         if output_struct is not None:
             if not issubclass(output_struct, BaseModel):
                 raise ConfigurationError("output_struct must be a Pydantic model")
+            # self.output_parser = PydanticOutputParser(pydantic_object=output_struct)
             self.output_parser = output_struct
+
         
-        logger.info(f"Output parser configured: {self.output_parser}")
+        # logger.info(f"Output parser configured: {self.output_parser.get_format_instructions()}")
 
         # Initialize prompt template
         self._setup_prompt_template()
         
+        # Initialize agent
+        self._setup_agent()
+
         # Initialize client
         self._setup_client()
         logger.info(f"Initialized {self._llm_type} LLM with model: {self.config.model_name}")
@@ -79,14 +88,14 @@ class BreeLLM(BaseLLM):
         
     def _setup_prompt_template(self):
         """Setup the prompt template with format instructions if needed"""
-        format_instructions = ""
-        if self.output_parser:
-            format_instructions = self.output_parser
-            
+        # format_instructions = self.output_parser.get_format_instructions() if self.output_parser else ""    
+        
+        # logger.info(f"Format instructions: {format_instructions}")
+        
+        logger.info(f"Input prompt configured: {self.input_prompt}")
         self.prompt = PromptTemplate(
             template=self.input_prompt,
             input_variables=["message"],
-            partial_variables={"format_instructions": format_instructions}
         )
         
     def _setup_client(self):
@@ -98,7 +107,14 @@ class BreeLLM(BaseLLM):
                                       max_tokens=self.config.max_tokens,
                                       temperature=self.config.temperature,
                                       timeout=self.config.timeout)
-        # self.llm = self.llm.with_structured_output(self.output_parser)
+
+
+    def _setup_agent(self):
+        """Setup the Pydantic AI agent for structured output parsing"""
+        self.agent = Agent(
+            model='gemini-1.5-flash',
+            system_prompt="You are a assistant tool mainly for parsing output structures. You are given a structured output and you need to parse it into a Pydantic model.",
+            result_type=self.output_parser)
         
     
     @property
@@ -133,27 +149,20 @@ class BreeLLM(BaseLLM):
         try:
             formatted_prompt = self.prompt.format(message=prompts[0])
             logger.info(f"Generating response for prompt: {formatted_prompt}")
-            # self.llm = self.llm.with_structured_output(self.output_parser)
 
             # Using Chain Method to generate response
             response = self.llm.invoke(formatted_prompt)
             logger.info(f"Response generated: {response}")
 
-            output = response
-            
-            # Parse output if parser is configured
-            if self.output_parser:
-                try:
-                    output = self.output_parser(output)
-                except Exception as e:
-                    raise ParseError(f"Failed to parse output: {str(e)}")
-                    
-            return [output]
+            response = await self.parse_output_to_json(response)
+
+            return [response.data]
             
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
             raise APIError(f"Failed to generate response: {str(e)}")
             
+
     async def generate_response(self, query: Optional[str] = None) -> str:
         """
         Convenience method for generating a single response.
@@ -167,8 +176,57 @@ class BreeLLM(BaseLLM):
         query = query or self.query
         logger.info(f"Generating response for query: {query}")
         responses = await self._generate([query])
-        logger.info(f"Response generated: {responses[0]}")
+        logger.info(f"Responses generated: {responses}")
+        # logger.info(f"Response generated: {responses[0]}")
         return responses[0]
+
+
+    async def parse_output_structure(self, response:str) -> BaseModel:
+        """
+        Parse the output structure of the response.
+        
+        Args:
+            response: The generated response
+            
+        Returns:
+            Parsed output structure
+            
+        Raises:
+            ParseError: If output parsing fails
+        """
+        if self.output_parser is None:
+            raise ParseError("No output parser configured")
+        
+        try:
+            parsed_output = await self.agent.run(response)
+            logger.info(f"Parsed output: {parsed_output}")
+            return parsed_output
+        except Exception as e:
+            logger.error(f"Error parsing output: {str(e)}")
+            raise ParseError(f"Failed to parse output: {str(e)}")
+        
+    
+    async def parse_output_to_json(self, response: str) -> Dict:
+        """
+        Parse the output structure of the response to a JSON dictionary.
+        
+        Args:
+            response: The generated response
+            
+        Returns:
+            Parsed output structure as a JSON dictionary
+        """
+        if isinstance(response, BaseModel):
+            return response
+        else:
+            raise ValueError("Response is not a Pydantic model")
+
+
+
+    async def close(self):
+        """Close the client connection"""
+        await self.llm.close()
+        logger.info("Client connection closed")
     
 
 
@@ -183,7 +241,7 @@ llm = BreeLLM(
     input_prompt="Generate a sonnet from the following text: {message}",
     query="The quick brown fox jumps over the lazy dog",
     output_struct=SonnetResponse,  # Optional,
-    config=LLMConfig(model_name="gemini-1.5-flash", max_tokens=512, temperature=0.7, api_key_env_var="GOOGLE_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
+    config=LLMConfig(model_name="gemini-1.5-flash", max_tokens=512, temperature=0.7, api_key_env_var="GEMINI_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
 )
 
 # Generate response
