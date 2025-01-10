@@ -1,0 +1,90 @@
+### **TODO List for AI Documentation Generator**
+
+---
+
+#### **Low-Level Components**
+
+---
+
+##### **Code Analysis**
+
+- File I/O and Codebase Scanning
+  - [x] Implement recursive directory traversal using file I/O libraries.
+  - [x] Filter files based on extensions or file patterns to include only source code.
+  - [x] Exclude irrelevant directories based on a predefined ignore list or `.gitignore` configuration.
+  - [x] Store details about each valid file, including path, size, and language.
+  - [x] Write test for scanning several repositories (Think about implementation with internet, e.g., github, huggingface, gitlab, etc.)
+---
+
+##### **Codebase Understanding**
+
+- Parsing & Structuring
+  - [x] Use language-specific parsers to analyze the code structure and extract relevant elements (functions, classes, modules). [Successfully Created for Py, Js, Java, C/C++, JSON.]
+  - [ ] Create a Universal Parser using an LLM for extracting and analyzing code structures and other relevant elements.
+  - [ ] Arrange the parsed information into a consistent JSON-like format.
+  - [ ] Identify relationships between code files, such as import/export dependencies and cross-module function calls.
+  - [ ] Generate a high-level understanding of the architecture for later prompts.
+
+---
+
+##### **Code Preparation for LLM**
+
+- Formatting and Refining of Code
+  - [ ] Strip unnecessary whitespace, comments, and inline debug statements.
+  - [ ] Divide large files into logical chunks to fit within the LLM's token limit.
+  - [ ] Add context headers before each chunk to ensure the LLM understands relationships.
+  - [ ] Use vector embeddings to encode code relationships and provide additional context when generating documentation.
+
+---
+
+#### **Mid-Level Components**
+
+---
+
+##### **Prompt Construction for LLM**
+
+- Objectives
+  - [x] Define a custom template that specifies how the LLM should format its output.
+  - [ ] Use the template to construct a structured prompt for each code chunk.
+  - [ ] Tweak the prompt and retry if the LLM output does not meet expectations.
+
+---
+
+##### **LangChain Integration for LLM Queries**
+
+- Objectives
+  - [x] Use LangChain to connect the LLM API.
+  - [ ] Break down the workflow into manageable chains: input, processing, and validation.
+  - [ ] Send prompts in batches to optimize for API rate limits.
+  - [ ] Ensure parallel processing where possible to reduce latency for large codebases.
+
+---
+
+##### **Raw Documentation Generation**
+
+- Objectives
+  - [ ] Retrieve LLM responses for each prompt.
+  - [ ] Store the raw documentation alongside the corresponding file/chunk metadata.
+  - [ ] Ensure output conforms to the custom documentation template.
+  - [ ] Post-process the responses to fix formatting issues.
+
+---
+
+##### **Usage Examples Integration**
+
+- Objectives
+  - [ ] Prompt the LLM to provide realistic examples of how to use functions/classes.
+  - [ ] Include variations: basic usage, edge cases, and typical input/output.
+  - [ ] Allow developers to add custom examples via a config file or annotations.
+  - [ ] Embed examples under dedicated "Usage Example" sections within the generated documentation.
+
+---
+
+##### **Template-Based Assembly**
+
+- Objectives
+  - [ ] Combine documentation for individual functions, classes, and modules into cohesive file-level docs.
+  - [ ] Organize sections into directories and include navigation.
+  - [ ] Generate an overview file describing the overall structure and relationships of directories and modules.
+
+---
