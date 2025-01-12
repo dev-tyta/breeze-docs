@@ -1,19 +1,19 @@
 import os
 import asyncio
 from typing import Optional, List, Union, Type, Any, Dict
-from langchain_openai import OpenAI
 from langchain_google_genai import GoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.language_models.llms import BaseLLM
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
 
+
 from src.llm.config import LLMConfig
 from src.llm.exceptions import LLMError, ConfigurationError, APIError, ParseError
 from src.llm.utils import retry_with_backoff, validate_api_key, logger
+from src.llm.g_col import LLMGarbageCollector
 
 load_dotenv()
 
@@ -28,10 +28,10 @@ class BreeLLM(BaseLLM):
         output_parser (Optional[PydanticOutputParser]): Parser for structured output
     """
     
+    _gc = LLMGarbageCollector()
     config: Optional[LLMConfig] = Field(default_factory=LLMConfig)
     query: str
     input_prompt: str
-    # output_parser: Optional[PydanticOutputParser] = None
     output_parser: Optional[Type[BaseModel]] = None
     prompt: Optional[PromptTemplate] = None
     llm: Optional[GoogleGenerativeAI] = None
@@ -75,6 +75,7 @@ class BreeLLM(BaseLLM):
         
         # logger.info(f"Output parser configured: {self.output_parser.get_format_instructions()}")
 
+        self._gc.register_resource(self)
         # Initialize prompt template
         self._setup_prompt_template()
         
@@ -150,13 +151,14 @@ class BreeLLM(BaseLLM):
             formatted_prompt = self.prompt.format(message=prompts[0])
             logger.info(f"Generating response for prompt: {formatted_prompt}")
 
-            
-            response = self.llm.invoke(formatted_prompt)
-            logger.info(f"Response generated: {response}")
+            with self._gc.track_resource(self.llm):
+                response = self.llm.invoke(formatted_prompt)
+                logger.info(f"Response generated: {response}")
 
-            response = await self.parse_output_structure(response)
+            with self._gc.track_resource(self.agent):
+                response = await self.parse_output_structure(response)
 
-            logger.info(f"Response parsed: {response.data}")
+                logger.info(f"Response parsed: {response.data}")
 
             response = self.struct_to_dict([response.data], self.output_parser)
 
@@ -164,6 +166,7 @@ class BreeLLM(BaseLLM):
             
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
+            self._gc.force_cleanup()
             raise APIError(f"Failed to generate response: {str(e)}")
             
 
@@ -229,6 +232,9 @@ class BreeLLM(BaseLLM):
 
         return dict_output
     
+    def __del__(self):
+        """Cleanup when instance is deleted"""
+        self._gc.force_cleanup()
 
 # Usage Example
 class SonnetResponse(BaseModel):
