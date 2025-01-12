@@ -11,7 +11,7 @@ from pydantic_ai import Agent
 
 
 from src.llm.config import LLMConfig
-from src.llm.exceptions import LLMError, ConfigurationError, APIError, ParseError
+from src.llm.exceptions import ConfigurationError, APIError, ParseError
 from src.llm.utils import retry_with_backoff, validate_api_key, logger
 from src.llm.g_col import LLMGarbageCollector
 
