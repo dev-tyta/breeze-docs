@@ -9,7 +9,6 @@ from langchain_core.language_models.llms import BaseLLM
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pprint import pprint
 
 
 from src.llm.config import LLMConfig
