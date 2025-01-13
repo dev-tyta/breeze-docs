@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
 
-
 from src.llm.config import LLMConfig
 from src.llm.exceptions import ConfigurationError, APIError, ParseError
 from src.llm.utils import retry_with_backoff, validate_api_key, logger
@@ -64,7 +63,6 @@ class BreeLLM(BaseLLM):
             **kwargs
         )
         
-        logger.info(f"Before Parsing Output Struct: {output_struct}")
         # Setup output parsing if needed
         if output_struct is not None:
             if not issubclass(output_struct, BaseModel):
@@ -72,9 +70,7 @@ class BreeLLM(BaseLLM):
             # self.output_parser = PydanticOutputParser(pydantic_object=output_struct)
             self.output_parser = output_struct
 
-        
-        # logger.info(f"Output parser configured: {self.output_parser.get_format_instructions()}")
-
+        # Register resource for garbage collection
         self._gc.register_resource(self)
         # Initialize prompt template
         self._setup_prompt_template()
@@ -89,20 +85,15 @@ class BreeLLM(BaseLLM):
         
     def _setup_prompt_template(self):
         """Setup the prompt template with format instructions if needed"""
-        # format_instructions = self.output_parser.get_format_instructions() if self.output_parser else ""    
-        
-        # logger.info(f"Format instructions: {format_instructions}")
-        
-        logger.info(f"Input prompt configured: {self.input_prompt}")
         self.prompt = PromptTemplate(
             template=self.input_prompt,
             input_variables=["message"],
         )
+        logger.info(f"Prompt template: {self.prompt}")
         
     def _setup_client(self):
         """Setup the OpenAI client with validation"""
         api_key = validate_api_key(os.getenv(self.config.api_key_env_var))
-        logger.info(f"Using API key: {api_key}")
         self.llm = GoogleGenerativeAI(api_key=api_key,
                                       model=self.config.model_name,
                                       max_tokens=self.config.max_tokens,
@@ -149,16 +140,14 @@ class BreeLLM(BaseLLM):
         """
         try:
             formatted_prompt = self.prompt.format(message=prompts[0])
-            logger.info(f"Generating response for prompt: {formatted_prompt}")
-
+            logger.info(f"Formatted prompt: {formatted_prompt}")
             with self._gc.track_resource(self.llm):
-                response = self.llm.invoke(formatted_prompt)
-                logger.info(f"Response generated: {response}")
+                response = self.llm.invoke(f"""{formatted_prompt}""")
+                logger.info(f"Response: {response}")
 
             with self._gc.track_resource(self.agent):
                 response = await self.parse_output_structure(response)
-
-                logger.info(f"Response parsed: {response.data}")
+                logger.info(f"Parsed response: {response}")
 
             response = self.struct_to_dict([response.data], self.output_parser)
 
@@ -181,9 +170,7 @@ class BreeLLM(BaseLLM):
             Generated response
         """
         query = query or self.query
-        logger.info(f"Generating response for query: {query}")
         responses = await self._generate([query])
-        logger.info(f"Responses generated: {responses}")
 
         return responses
 
@@ -206,7 +193,6 @@ class BreeLLM(BaseLLM):
         
         try:
             parsed_output = await self.agent.run(response)
-            logger.info(f"Parsed output: {parsed_output}")
             return parsed_output
         except Exception as e:
             logger.error(f"Error parsing output: {str(e)}")
@@ -236,26 +222,25 @@ class BreeLLM(BaseLLM):
         """Cleanup when instance is deleted"""
         self._gc.force_cleanup()
 
-# Usage Example
-class SonnetResponse(BaseModel):
-    """Pydantic model for sonnet response"""
-    title: str
-    sonnet: str
+# # Usage Example
+# class SonnetResponse(BaseModel):
+#     """Pydantic model for sonnet response"""
+#     title: str
+#     sonnet: str
 
 
-# Initialize LLM
-llm = BreeLLM(
-    input_prompt="Generate a title and sonnet from the following text: {message}",
-    query="The quick brown fox jumps over the lazy dog",
-    output_struct=SonnetResponse,  # Optional,
-    config=LLMConfig(model_name="gemini-1.5-flash", max_tokens=512, temperature=0.7, api_key_env_var="GEMINI_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
-)
+# # Initialize LLM
+# llm = BreeLLM(
+#     input_prompt="Generate a title and sonnet from the following text: {message}",
+#     query="The quick brown fox jumps over the lazy dog",
+#     output_struct=SonnetResponse,  # Optional,
+#     config=LLMConfig(model_name="gemini-1.5-flash", max_tokens=512, temperature=0.7, api_key_env_var="GEMINI_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
+# )
 
-# # Generate response
-async def main():
-    response = await llm.generate_response()
-    logger.info(f"Response: {response}")
-    print(response)
+# # # Generate response
+# async def main():
+#     response = await llm.generate_response()
+#     print(response)
 
 
-asyncio.run(main())
+# asyncio.run(main())

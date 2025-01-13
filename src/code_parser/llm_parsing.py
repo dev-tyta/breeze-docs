@@ -66,18 +66,26 @@ class LLMCodeParser:
 
     def _define_prompt(self, content:str) -> str:
         prompt = f"""
-                Analyze the following {self.language} code and its structure.
-                Identify all imports, global_variables, functions, classes, variables and other essential components of the codebase.
-                For functions, extract the parameters, decorators, docstring, contents, return types, and implementation.
-                for classes, identify methods, attributes, parent_classes, and docstrings.
+                    Analyze the following {self.language} code and its structure.
+                    Identify all imports, global_variables, functions, classes, variables and other essential components of the codebase.
+                    For functions, extract the parameters, decorators, docstring, contents, return types, and implementation.
+                    For classes, identify methods, attributes, parent_classes, and docstrings.
+                    Provide a structured response that can be parsed into the OutputParser.
 
+                    {{{{
+                        "language": [],
+                        "imports": [],
+                        "classes": [],
+                        "functions": [],
+                        "global_variables": []
+                    }}}}
 
-                Code to analyze:
-                ```{self.language}
-                {content}
-                ```
-                Provide a structured response that can be parsed into the OutputParser.
-            """
+                    Code to analyze:
+                    {self.language}
+                    {content}
+                    
+                    Provide a structured response that can be parsed into the OutputParser.
+                """
         logging.info(f"Prompt defined: {prompt}")
         return prompt
     
@@ -102,19 +110,18 @@ class LLMCodeParser:
 
             output = await self.model.generate_response()
             logging.info(f"Model output: {output}")
-            return ModuleParser(**output)
+            return output
         except Exception as e:
             logging.error(f"Error parsing code: {str(e)}")
             return None
         
     
-    def _parse_to_json(self, parsed:ModuleParser) -> Dict[str, Any]:
-        dict_output = parsed
-        logging.info(f"Output parsed to dictionary: {dict_output}")
+    def _parse_to_json(self, parsed_output:Dict[str, Any]) -> Dict[str, Any]:
+        logging.info(f"Output parsed to dictionary: {parsed_output}")
         with open(f"./{os.path.splitext(self.file_name)[0]}.json", "w") as file:
-            json.dump(dict_output, file)
+            json.dump(parsed_output, file)
 
-        return dict_output
+        return parsed_output
     
     async def parse_file(self) -> ModuleParser:
         with open(self.file_path, "r", encoding="utf-8") as file:
