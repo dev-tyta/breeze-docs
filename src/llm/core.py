@@ -86,8 +86,8 @@ class BreeLLM(BaseLLM):
     def _setup_prompt_template(self):
         """Setup the prompt template with format instructions if needed"""
         self.prompt = PromptTemplate(
-            template=self.input_prompt,
             input_variables=["message"],
+            template=self.input_prompt
         )
         logger.info(f"Prompt template: {self.prompt}")
         
@@ -222,25 +222,25 @@ class BreeLLM(BaseLLM):
         """Cleanup when instance is deleted"""
         self._gc.force_cleanup()
 
-# # Usage Example
-# class SonnetResponse(BaseModel):
-#     """Pydantic model for sonnet response"""
-#     title: str
-#     sonnet: str
+# Usage Example
+class SonnetResponse(BaseModel):
+    """Pydantic model for sonnet response"""
+    title: str
+    sonnet: str
 
 
-# # Initialize LLM
-# llm = BreeLLM(
-#     input_prompt="Generate a title and sonnet from the following text: {message}",
-#     query="The quick brown fox jumps over the lazy dog",
-#     output_struct=SonnetResponse,  # Optional,
-#     config=LLMConfig(model_name="gemini-1.5-flash", max_tokens=512, temperature=0.7, api_key_env_var="GEMINI_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
-# )
+# Initialize LLM
+llm = BreeLLM(
+    input_prompt="Generate a title and sonnet from the following text: {message}",
+    query="The quick brown fox jumps over the lazy dog",
+    output_struct=SonnetResponse,  # Optional,
+    config=LLMConfig(model_name="gemini-1.5-flash", max_tokens=512, temperature=0.7, api_key_env_var="GEMINI_API_KEY", timeout=30, retry_attempts=3, retry_wait=1.0)
+)
 
-# # # Generate response
-# async def main():
-#     response = await llm.generate_response()
-#     print(response)
+# # Generate response
+async def main():
+    response = await llm.generate_response()
+    print(response)
 
 
-# asyncio.run(main())
+asyncio.run(main())
