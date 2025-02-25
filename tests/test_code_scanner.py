@@ -11,7 +11,7 @@ current_dir = Path(__file__).parent.absolute()
 parent_dir = current_dir.parent
 sys.path.append(str(parent_dir))
 
-from code_parser.code_scanner import CodeAnalyzer
+from src.code_parser.code_scanner import CodeAnalyzer
 
 def main():
     """
