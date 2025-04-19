@@ -5,7 +5,7 @@ from functools import wraps
 import time
 import asyncio
 
-from .exceptions import ConfigurationError
+from src.exceptions import ConfigurationError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

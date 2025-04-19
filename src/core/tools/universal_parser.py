@@ -9,6 +9,7 @@ import asyncio
 from src.llm.core import BreeLLM
 from src.llm.internals.parser_structure import ModuleParser
 from src.llm.config import LLMConfig
+from textwrap import dedent
 
 
 class LLMCodeParser:
@@ -86,8 +87,8 @@ class LLMCodeParser:
                     
                     Provide a structured response that can be parsed into the OutputParser.
                 """
-        logging.info(f"Prompt defined: {prompt}")
-        return prompt
+        logging.info(f"Prompt defined: {dedent(prompt)}")
+        return dedent(prompt)
     
 
     async def parse(self, content:str) -> ModuleParser:
@@ -146,7 +147,7 @@ class LLMCodeParser:
     
     
 # Usage Example
-parser = LLMCodeParser(file_path="/workspaces/breeze-docs/src/code_parser/ast_parser.py")
+parser = LLMCodeParser(file_path="/home/testys/Documents/GitHub/breeze_docs/src/code_parser/code_scanner.py")
 
 # Generate response
 async def main():

@@ -3,8 +3,9 @@ from typing import Optional, Dict, Any
 
 class LLMConfig(BaseModel):
     """Configuration settings for the LLM"""
-    model_name: str = Field(default="gemini-1.5-flash")
+    model_name: str = Field(default="gemini-2.0-flash")
     max_tokens: int = Field(default=4096)
+    max_iterations: int = Field(default=9)
     temperature: float = Field(default=0.7)
     api_key_env_var: str = Field(default="GEMINI_API_KEY")
     timeout: int = Field(default=30)
