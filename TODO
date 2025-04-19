@@ -1,136 +1,127 @@
-### **TODO List for AI Documentation Generator**
+# Bree-MD Documentation Generator TODO List
 
+This document tracks the progress on the development tasks for the Bree-MD project.
 
-**Mapping TODO List to Agents and Tools:**
+## Completed Files/Modules
 
-Here's how we can map your existing TODO list to the agents and tools we've outlined:
+- [x] `src/config/settings.py` (App configuration & LLM settings)
+- [x] `src/config/security.py` (Security settings & API key validation)
+- [x] `src/utils/error_handling.py` (Retry logic & Circuit Breaker)
+- [x] `src/utils/sanitization.py` (Input sanitization)
+- [x] `src/utils/logging.py` (Logging setup)
+- [x] `src/core/llm/client.py` (LLM client implementation & LangChain integration)
+- [x] `src/core/llm/prompter.py` (Prompt engineering & template definition)
 
----
+## Remaining TODO Items
 
-#### **Low-Level Components**
+### Low-Level Components
 
----
+#### Code Analysis: File I/O and Codebase Scanning
 
-##### **Code Analysis**
+- [ ] Define input parameters (root directory, ignore patterns)
+- [ ] Implement directory listing
+- [ ] Implement recursive traversal logic
+- [ ] Handle potential file system errors (permissions, broken links)
+- [ ] Filter files based on extensions or file patterns to include only source code
+- [ ] Exclude irrelevant directories based on a predefined ignore list or .gitignore configuration
+- [ ] Store details about each valid file, including path, size, and language
+- [ ] Write test for scanning several repositories (Think about implementation with internet, e.g., github, huggingface, gitlab, etc.)
 
-- **File I/O and Codebase Scanning**
-    - **[x] Implement recursive directory traversal using file I/O libraries.**
-        - **Agent:** `RepoCrawlerAgent`
-        - **Tool:** `FileSystemCrawlerTool` (Needs to be implemented)
-    - **[x] Filter files based on extensions or file patterns to include only source code.**
-        - **Agent:** `RepoCrawlerAgent`
-        - **Tool:** `FileSystemCrawlerTool` (Needs to handle file extension filtering)
-    - **[x] Exclude irrelevant directories based on a predefined ignore list or `.gitignore` configuration.**
-        - **Agent:** `RepoCrawlerAgent`
-        - **Tool:** `FileSystemCrawlerTool` (Needs to handle directory exclusion based on patterns, potentially reading `.gitignore`)
-    - **[x] Store details about each valid file, including path, size, and language.**
-        - **Agent:** `RepoCrawlerAgent`
-        - **Tool:** `FileSystemCrawlerTool` (Needs to return this metadata)
-    - **[x] Write test for scanning several repositories (Think about implementation with internet, e.g., github, huggingface, gitlab, etc.)**
-        - **Agent:** `RepoCrawlerAgent`
-        - **Tool:** `GithubRepoDownloaderTool` (Needs to be implemented for downloading) and `FileSystemCrawlerTool` (for scanning downloaded content). We'll need to consider how to handle different repository platforms.
+**Agent:** RepoCrawlerAgent  
+**Tools:** FileSystemCrawlerTool, GithubRepoDownloaderTool
 
----
+#### Codebase Understanding: Parsing & Structuring
 
-##### **Codebase Understanding**
+- [x] Use language-specific parsers to analyze the code structure and extract relevant elements (functions, classes, modules). [Successfully Created for Py, Js, Java, C/C++, JSON.] *(Note: The tools for this still need to be integrated/developed, but the concept is marked as addressed)*
+- [ ] Create a Universal Parser using an LLM for extracting and analyzing code structures and other relevant elements
 
-- **Parsing & Structuring**
-    - **[x] Use language-specific parsers to analyze the code structure and extract relevant elements (functions, classes, modules). [Successfully Created for Py, Js, Java, C/C++, JSON.]**
-        - **Agent:** `CodeUnderstandingAgent`
-        - **Tool:** `PythonCodeParserTool`, `JavaScriptCodeParserTool`, `JavaCodeParserTool`, `CppCodeParserTool`, `JsonCodeParserTool` (These will need to be implemented as separate tools that take file content as input and return structured data).
-    - **[ ] Create a Universal Parser using an LLM for extracting and analyzing code structures and other relevant elements.**
-        - **Agent:** `CodeUnderstandingAgent`
-        - **Tool:** `UniversalCodeParserTool` (Needs to be implemented, will likely use `BreeLLM` internally).
-    - **[ ] Arrange the parsed information into a consistent JSON-like format.**
-        - **Agent:** `CodeUnderstandingAgent` (This will be the output format of this agent after using the parser tools).
-    - **[ ] Identify relationships between code files, such as import/export dependencies and cross-module function calls.**
-        - **Agent:** `CodeUnderstandingAgent` (This might require additional logic within the agent, potentially using the output from the parsers or making additional calls to the LLM via `UniversalCodeParserTool`).
-    - **[ ] Generate a high-level understanding of the architecture for later prompts.**
-        - **Agent:** `CodeUnderstandingAgent` (This will likely involve using the `UniversalCodeParserTool` to summarize the overall structure).
+**Agent:** `CodeUnderstandingAgent`
 
----
+**Tool:** `UniversalCodeParserTool`
 
-##### **Code Preparation for LLM**
+- [ ] Arrange the parsed information into a consistent JSON-like format
 
-- **Formatting and Refining of Code**
-    - **[ ] Strip unnecessary whitespace, comments, and inline debug statements.**
-        - **Utility Function:** This could be a utility function called by agents that interact with the LLM (`DocumentationGenerationAgent`, `UsageExampleGenerationAgent`) or potentially within the `CodeUnderstandingAgent` before passing content to the LLM.
-    - **[ ] Divide large files into logical chunks to fit within the LLM's token limit.**
-        - **Utility Function:** This will be needed in agents that process file content with the LLM.
-    - **[ ] Add context headers before each chunk to ensure the LLM understands relationships.**
-        - **Utility Function:** This will be needed when chunking to maintain context.
-    - **[ ] Use vector embeddings to encode code relationships and provide additional context when generating documentation.**
-        - **Agent:** Potentially the `CodeUnderstandingAgent` or the `DocumentationGenerationAgent`.
-        - **Tool:** `CodeEmbeddingTool` (Needs to be implemented, will likely use an embedding model).
+**Agent:** `CodeUnderstandingAgent`
 
----
+- [ ] Identify relationships between code files, such as import/export dependencies and cross-module function calls
 
-#### **Mid-Level Components**
+**Agent:** `CodeUnderstandingAgent`
 
----
+- [ ] Generate a high-level understanding of the architecture for later prompts
 
-##### **Prompt Construction for LLM**
+**Agent:** `CodeUnderstandingAgent`
 
-- **Objectives**
-    - **[x] Define a custom template that specifies how the LLM should format its output.**
-        - **Agent:** This will be part of the prompt engineering within each agent that uses the LLM.
-    - **[ ] Use the template to construct a structured prompt for each code chunk.**
-        - **Agent:** Each agent (`DocumentationGenerationAgent`, `UsageExampleGenerationAgent`, `CodeUnderstandingAgent` for the Universal Parser) will handle its prompt construction.
-    - **[ ] Tweak the prompt and retry if the LLM output does not meet expectations.**
-        - **Agent Logic:** This will be part of the internal logic of the agents, potentially using the `@retry_with_backoff` decorator or more sophisticated retry mechanisms.
+#### Code Preparation for LLM: Formatting and Refining of Code
 
----
+- [ ] Strip unnecessary whitespace, comments, and inline debug statements *(Sanitization utility exists, but application to code chunks is pending)*
+- [ ] Divide large files into logical chunks to fit within the LLM's token limit
+- [ ] Add context headers before each chunk to ensure the LLM understands relationships
+- [ ] Use vector embeddings to encode code relationships and provide additional context when generating documentation
 
-##### **LangChain Integration for LLM Queries**
+**Agent:** Potentially `CodeUnderstandingAgent` or `DocumentationGenerationAgent`  
+**Tool:** `CodeEmbeddingTool`
 
-- **Objectives**
-    - **[x] Use LangChain to connect the LLM API.**
-        - **`BreeLLM`:** Your current implementation in `src/core/llm.py` handles this.
-    - **[ ] Break down the workflow into manageable chains: input, processing, and validation.**
-        - **Agent Design:** Each agent's `run` method will represent a chain of operations.
-    - **[ ] Send prompts in batches to optimize for API rate limits.**
-        - **Agent Logic or Orchestrator:** This optimization can be implemented within the agents or in the main orchestration logic in `main.py`.
-    - **[ ] Ensure parallel processing where possible to reduce latency for large codebases.**
-        - **Orchestrator (`main.py`):** We can use `asyncio.gather` to run independent agents or tasks concurrently.
+### Mid-Level Components
 
----
+#### Prompt Construction for LLM: Objectives
 
-##### **Raw Documentation Generation**
+- [x] Define a custom template that specifies how the LLM should format its output *(Done in `prompter.py`)*
+- [x] Use the template to construct a structured prompt for each code chunk *(Done in `prompter.py`)*
+- [x] Tweak the prompt and retry if the LLM output does not meet expectations *(Retry mechanism done in `error_handling.py`, "tweak prompt" logic is part of agent/orchestration)*
 
-- **Objectives**
-    - **[ ] Retrieve LLM responses for each prompt.**
-        - **Agent:** `DocumentationGenerationAgent` (using the `LLMTool`).
-    - **[ ] Store the raw documentation alongside the corresponding file/chunk metadata.**
-        - **Agent:** `DocumentationGenerationAgent` (will likely store this internally or pass it to the `DocumentationAssemblyAgent`).
-    - **[ ] Ensure output conforms to the custom documentation template.**
-        - **Prompt Engineering:** This will be enforced through careful prompt design within the `DocumentationGenerationAgent`.
-    - **[ ] Post-process the responses to fix formatting issues.**
-        - **Agent Logic or Utility Function:** This can be done within the `DocumentationGenerationAgent` or using a separate utility function.
+#### LangChain Integration for LLM Queries
 
----
+- [x] Use LangChain to connect the LLM API *(Done in client.py)*
+- [ ] Break down the workflow into manageable chains: input, processing, and validation
 
-##### **Usage Examples Integration**
+**Agent Design:** Each agent's run method will represent a chain of operations.
 
-- **Objectives**
-    - **[ ] Prompt the LLM to provide realistic examples of how to use functions/classes.**
-        - **Agent:** `UsageExampleGenerationAgent` (using the `LLMTool`).
-    - **[ ] Include variations: basic usage, edge cases, and typical input/output.**
-        - **Prompt Engineering:** This will be part of the prompt design for the `UsageExampleGenerationAgent`.
-    - **[ ] Allow developers to add custom examples via a config file or annotations.**
-        - **Tool:** We might need a tool to read configuration files or parse code annotations.
-    - **[ ] Embed examples under dedicated "Usage Example" sections within the generated documentation.**
-        - **Agent:** `DocumentationAssemblyAgent` will handle the formatting and placement of these examples.
+- [ ] Send prompts in batches to optimize for API rate limits
+- [ ] Ensure parallel processing where possible to reduce latency for large codebases
+- [ ] Orchestrator (`main.py`) to manage the flow of data between components
 
----
+#### Raw Documentation Generation: Objectives
 
-##### **Template-Based Assembly**
+- [ ] Retrieve LLM responses for each prompt *(Handled by client.py, but the agent using it is pending)*
 
-- **Objectives**
-    - **[ ] Combine documentation for individual functions, classes, and modules into cohesive file-level docs.**
-        - **Agent:** `DocumentationAssemblyAgent` (using the `TemplateRendererTool`).
-    - **[ ] Organize sections into directories and include navigation.**
-        - **Agent:** `DocumentationAssemblyAgent` (will need logic to create the directory structure and navigation elements).
-    - **[ ] Generate an overview file describing the overall structure and relationships of directories and modules.**
-        - **Agent:** `DocumentationAssemblyAgent` (might need to use information from the `CodeUnderstandingAgent`).
+**Agent:** `DocumentationGenerationAgent`  
+**Tool:** `LLMTool`
 
----
+- [ ] Store the raw documentation alongside the corresponding file/chunk metadata
+
+**Agent:** `DocumentationGenerationAgent`
+
+- [ ] Ensure output conforms to the custom documentation template *(Prompting for this is done; verification might be needed)*
+- [ ] Post-process the responses to fix formatting issues
+
+#### Usage Examples Integration: Objectives
+
+- [ ] Prompt the LLM to provide realistic examples of how to use functions/classes *(Prompt template done, agent logic pending)*
+
+**Agent:** `UsageExampleGenerationAgent`
+
+**Tool:** `LLMTool`
+
+- [ ] Include variations: basic usage, edge cases, and typical input/output *(Part of prompt engineering/agent logic)*
+- [ ] Allow developers to add custom examples via a config file or annotations
+
+**Tool:** Configuration/Annotation Parser Tool
+
+- [ ] Embed examples under dedicated "Usage Example" sections within the generated documentation
+
+**Agent:** `DocumentationAssemblyAgent`
+
+#### Template-Based Assembly: Objectives
+
+- [ ] Combine documentation for individual functions, classes, and modules into cohesive file-level docs
+
+**Agent:** `DocumentationAssemblyAgent`  
+**Tool:** `TemplateRendererTool`
+
+- [ ] Organize sections into directories and include navigation
+
+**Agent:** `DocumentationAssemblyAgent`
+
+- [ ] Generate an overview file describing the overall structure and relationships of directories and modules
+
+**Agent:** `DocumentationAssemblyAgent`
