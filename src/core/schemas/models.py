@@ -2,6 +2,7 @@ import os
 import logging
 from typing import List, Dict, Optional, Any, Union # Import Union for flexibility
 from pydantic import BaseModel, Field, model_validator, ValidationError # Import ValidationError
+from datetime import datetime # Import datetime for last_modified field
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -86,13 +87,28 @@ class ModuleParser(BaseModel):
         for element_list in [self.functions, self.classes]:
             for element in element_list:
                 if element.start_line is not None and element.end_line is not None: # Check if lines are provided
-                    if element.start_line > element.end_line: # Changed from >= to > as start_line can equal end_line for single-line elements
+                    # start_line must be less than or equal to end_line for single-line elements
+                    if element.start_line > element.end_line:
                          logger.error(f"Validation Error: Invalid line numbers for {element.name} in {self.file_path} - start_line ({element.start_line}) must be less than or equal to end_line ({element.end_line}).")
                          raise ValueError(f"Invalid line numbers for {element.name}: start_line ({element.start_line}) must be less than or equal to end_line ({element.end_line})")
         return self
 
     # Note: Pydantic v2 uses model_validator. root_validator is deprecated.
-    # The user's original code correctly used model_validator.
+
+
+# --- Schema for File Metadata ---
+
+class FileMetadata(BaseModel):
+    """Represents basic metadata for a source code file."""
+    path: str = Field(..., description="The relative path to the file from the root directory.")
+    name: str = Field(..., description="The name of the file.")
+    extension: str = Field(..., description="The file extension.")
+    size: int = Field(..., description="The size of the file in bytes.")
+    language: str = Field(..., description="The detected programming language of the file.")
+    last_modified: datetime = Field(..., description="The last modified timestamp of the file.")
+    # Could add a field for raw content if needed before full parsing
+    raw_content: Optional[str] = Field(None, description="The full raw source code content.")
+
 
 # --- Example of a potential Agent Input/Output Schema ---
 # These would be used to define the expected input and output format for agents.
@@ -124,13 +140,13 @@ class DocumentationOutput(AgentOutput):
 #     # Ensure logging is set up if running this file directly
 #     if not logging.getLogger().handlers:
 #          logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
+#
 #     # Example of creating a ModuleParser instance (requires a dummy file)
 #     dummy_file_path = "temp_dummy_module.py"
 #     try:
 #         with open(dummy_file_path, "w") as f:
 #             f.write("# Dummy file\n\ndef my_func():\n    pass\n\nclass MyClass:\n    pass")
-
+#
 #         # Create dummy data conforming to the schemas
 #         param_schema = Parameter(name="x", type_annotation="int", default_value="0")
 #         func_schema = FunctionParser(
@@ -152,7 +168,7 @@ class DocumentationOutput(AgentOutput):
 #             docstring='"""A dummy class."""'
 #         )
 #         var_schema = Variable(name="GLOBAL_VAR", type_annotation="str", value='"hello"')
-
+#
 #         module_data = {
 #             "name": "temp_dummy_module",
 #             "file_path": dummy_file_path,
@@ -163,7 +179,7 @@ class DocumentationOutput(AgentOutput):
 #             "global_variables": [var_schema.model_dump()],
 #             "raw_content": "# Dummy file\n\ndef my_func():\n    pass\n\nclass MyClass:\n    pass"
 #         }
-
+#
 #         # Validate the data against the ModuleParser schema
 #         try:
 #             parsed_module = ModuleParser(**module_data)
@@ -172,22 +188,34 @@ class DocumentationOutput(AgentOutput):
 #         except ValidationError as e:
 #             print("Schema validation failed!")
 #             print(e.errors())
-
+#
 #     finally:
 #         # Clean up the dummy file
 #         if os.path.exists(dummy_file_path):
 #             os.remove(dummy_file_path)
 #             print(f"\nCleaned up {dummy_file_path}")
-
+#
+#     # Example of creating a FileMetadata instance
+#     file_meta = FileMetadata(
+#         path="src/utils/example.py",
+#         name="example.py",
+#         extension=".py",
+#         size=1024,
+#         language="python",
+#         last_modified=datetime.now()
+#     )
+#     print("\nFile Metadata Schema:")
+#     print(file_meta.model_dump_json(indent=2))
+#
 #     # Example of validation failure (invalid line numbers)
-#     try:
-#         invalid_module_data = {
-#             "name": "invalid_module",
-#             "file_path": "non_existent_file.py", # This will also fail
-#             "functions": [{"name": "bad_func", "start_line": 5, "end_line": 3, "content": "...", "type": "function"}],
-#             "classes": [], "imports": [], "global_variables": [], "docstring": None, "raw_content": None
-#         }
-#         invalid_module = ModuleParser(**invalid_module_data)
-#     except ValidationError as e:
-#         print("\nSchema validation correctly failed for invalid data:")
-#         print(e.errors())
+#     # try:
+#     #     invalid_module_data = {
+#     #         "name": "invalid_module",
+#     #         "file_path": "non_existent_file.py", # This will also fail
+#     #         "functions": [{"name": "bad_func", "start_line": 5, "end_line": 3, "content": "...", "type": "function"}],
+#     #         "classes": [], "imports": [], "global_variables": [], "docstring": None, "raw_content": None
+#     #     }
+#     #     invalid_module = ModuleParser(**invalid_module_data)
+#     # except ValidationError as e:
+#     #     print("\nSchema validation correctly failed for invalid data:")
+#     #     print(e.errors())

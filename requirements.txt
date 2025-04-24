@@ -9,4 +9,4 @@ langchain_openai
 langchain_anthropic
 pydantic
 langchain-google-genai
-pydantic-ai
+PyGithub

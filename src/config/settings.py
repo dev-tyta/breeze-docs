@@ -67,6 +67,12 @@ class LLMSettings(BaseSettings):
         # Removed env="LLM_RETRY_ATTEMPTS" to rely on env_prefix="BREE_"
     )
 
+    # --- GitHub Authentication Settings ---
+    github_access_token: SecretStr = Field(
+        ..., # Optional GitHub access token
+        # env="BREE_LLM_GITHUB_API_KEY
+    )
+
     # --- Circuit Breaker Settings ---
     # Number of consecutive failures before the circuit opens.
     # Loaded from BREE_LLM_CB_FAILURE_THRESHOLD.

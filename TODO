@@ -18,17 +18,22 @@ This document tracks the progress on the development tasks for the Bree-MD proje
 
 #### Code Analysis: File I/O and Codebase Scanning
 
-- [ ] Define input parameters (root directory, ignore patterns)
-- [ ] Implement directory listing
-- [ ] Implement recursive traversal logic
-- [ ] Handle potential file system errors (permissions, broken links)
-- [ ] Filter files based on extensions or file patterns to include only source code
-- [ ] Exclude irrelevant directories based on a predefined ignore list or .gitignore configuration
-- [ ] Store details about each valid file, including path, size, and language
-- [ ] Write test for scanning several repositories (Think about implementation with internet, e.g., github, huggingface, gitlab, etc.)
+- [x] Define input parameters (root directory, ignore patterns)
+- [x] Implement directory listing
+- [x] Implement recursive traversal logic
+- [x] Handle potential file system errors (permissions, broken links)
+- [x] Filter files based on extensions or file patterns to include only source code
+- [x] Exclude irrelevant directories based on a predefined ignore list or .gitignore configuration
+- [x] Store details about each valid file, including path, size, and language
+- [ ] Implement internet-based repository scanning (e.g., GitHub, GitLab, Hugging Face)
+    - [x] Implement GithubRepoDownloaderTool (fetches files using an access token) - Next Step
+    - [ ] Implement GitHub OAuth backend logic (handle authorization flow, token exchange)
+    - [ ] Implement secure storage for access tokens
+    - [ ] Integrate RepoDownloaderTool with authentication system
+    - [ ] Write tests for internet-based scanning
 
-**Agent:** RepoCrawlerAgent  
-**Tools:** FileSystemCrawlerTool, GithubRepoDownloaderTool
+**Agent:** `RepoCrawlerAgent`  
+**Tools:** `FileSystemCrawlerTool`, `GithubRepoDownloaderTool`
 
 #### Codebase Understanding: Parsing & Structuring
 
