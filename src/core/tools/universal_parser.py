@@ -1,157 +1,161 @@
-import sys
 import os
-import json
-from typing import Dict, Any
-from pathlib import Path
 import logging
-import asyncio
+import json
+import re
+from typing import Any, Dict, Optional, List
+from pathlib import Path
+from pydantic import ValidationError
 
-from src.llm.core import BreeLLM
-from src.llm.internals.parser_structure import ModuleParser
-from src.llm.config import LLMConfig
-from textwrap import dedent
+from src.core.tools.base import BaseTool
+from src.core.llm.client import GeminiClient
+from src.core.schemas.models import ModuleParser
+from src.config.settings import get_settings
 
+logger = logging.getLogger(__name__)
 
-class LLMCodeParser:
+class UniversalParser(BaseTool):
     """
-    Code Parser using the LLM Capabilities and prompt engineering.
-
+    A universal code parser powered by an LLM (Gemini).
+    It parses source code into a structured ModuleParser object.
     """
-    DEFAULT_FILE_EXTENSIONS = {".py": "python",
-                             ".java": "java",
-                             ".c": "c",
-                             ".cpp": "cpp",
-                             ".js": "javascript",
-                             ".ts": "typescript",
-                             ".html": "html",
-                             ".css": "css",
-                             ".scss": "scss",
-                             ".json": "json",
-                             ".xml": "xml",
-                             ".yaml": "yaml",
-                             ".yml": "yaml",
-                             ".sh": "bash",
-                             ".bat": "batch",
-                             ".ps1": "powershell",
-                             ".sql": "sql",
-                             ".php": "php",
-                             ".rb": "ruby",
-                             ".go": "go",
-                             ".rs": "rust",
-                             ".kt": "kotlin",
-                             ".swift": "swift",
-                             ".pl": "perl",
-                             ".lua": "lua",
-                             ".r": "r",
-                             ".m": "matlab",
-                             ".ipynb": "jupyter",
-                             ".md": "markdown",
-                             ".txt": "text",
-                             ".log": "log",
-                             ".jl": "julia"}
-    
-    def __init__(self, file_path):
-        logging.basicConfig(level=logging.INFO)
-        logging.info("LLM Code Parser Initialized")
-        self.file_path = file_path
-        self.file_name = os.path.basename(file_path)
 
+    def __init__(self, llm_client: GeminiClient):
+        super().__init__(name="universal_parser", description="Parses code using LLM")
+        self.llm_client = llm_client
+
+    async def run(self, tool_input: str, *args: Any, **kwargs: Any) -> Optional[ModuleParser]:
+        """
+        Parses the given file path or code content.
         
-    @property
-    def language(self) -> str:
-        # use the extensions to get the language for the codebase.
-        name: str = self.DEFAULT_FILE_EXTENSIONS.get(os.path.splitext(self.file_name)[1], "unknown")
-
-        return name
-    
-
-    def _define_prompt(self, content:str) -> str:
-        prompt = f"""
-                    Analyze the following {self.language} code and its structure.
-                    Identify all imports, global_variables, functions, classes, variables and other essential components of the codebase.
-                    For functions, extract the parameters, decorators, docstring, contents, return types, and implementation.
-                    For classes, identify methods, attributes, parent_classes, and docstrings.
-                    Provide a structured response that can be parsed into the OutputParser.
-
-                    {{{{
-                        "language": [],
-                        "imports": [],
-                        "classes": [],
-                        "functions": [],
-                        "global_variables": []
-                    }}}}
-
-                    Code to analyze:
-                    {self.language}
-                    {content}
-                    
-                    Provide a structured response that can be parsed into the OutputParser.
-                """
-        logging.info(f"Prompt defined: {dedent(prompt)}")
-        return dedent(prompt)
-    
-
-    async def parse(self, content:str) -> ModuleParser:
+        Args:
+            tool_input: Absolute file path to the file to parse.
+        
+        Returns:
+            ModuleParser object or None if parsing fails.
+        """
+        file_path = tool_input
+        if not os.path.exists(file_path):
+             logger.error(f"File not found: {file_path}")
+             raise ValueError(f"File not found: {file_path}")
+             
         try:
-            input_prompt = self._define_prompt(content=content)
-            logging.info(f"Prompt defined: {input_prompt}")
-            self.model = BreeLLM(input_prompt=input_prompt,
-                                 query="",
-                                 output_struct=ModuleParser,
-                                 config=LLMConfig(model_name="gemini-1.5-flash",
-                                                  max_tokens=512,
-                                                  temperature=0.7,
-                                                  api_key_env_var="GEMINI_API_KEY",
-                                                  timeout=30,
-                                                  retry_attempts=3,
-                                                  retry_wait=1.0
-                                                  )
-                                            )
-            logging.info("Model initialized")
-
-            output = await self.model.generate_response()
-            logging.info(f"Model output: {output}")
-            return output
+             with open(file_path, "r", encoding="utf-8") as f:
+                 content = f.read()
         except Exception as e:
-            logging.error(f"Error parsing code: {str(e)}")
+             logger.error(f"Failed to read file {file_path}: {e}")
+             raise
+             
+        return await self.parse_content(content, file_path)
+
+    async def parse_content(self, content: str, file_path: str) -> Optional[ModuleParser]:
+        """
+        Parses code content using the LLM.
+        """
+        file_name = os.path.basename(file_path)
+        prompt = self._construct_prompt(content, file_name)
+        
+        try:
+            # We want JSON output. Gemini supports response_mime_type="application/json" generally,
+            # but via LangChain interface or raw we need to be careful. 
+            # The existing GeminiClient.generate returns a string.
+            # We will ask for JSON in the prompt and then parse it.
+            
+            response = await self.llm_client.generate(prompt)
+            return self._parse_llm_response(response, file_path, content)
+            
+        except Exception as e:
+            logger.error(f"Error during LLM parsing of {file_path}: {e}", exc_info=True)
             return None
+
+    def _construct_prompt(self, content: str, file_name: str) -> str:
+        # Get the schema as a simplified JSON structure to guide the model
+        schema_hint = """
+        {
+            "name": "module_name",
+            "file_path": "path/to/file",
+            "imports": ["import os", ...],
+            "functions": [
+                {
+                    "name": "func_name",
+                    "start_line": 1,
+                    "end_line": 10,
+                    "content": "def func()...",
+                    "body": "...",
+                    "type": "function",
+                    "parameters": [{"name": "arg1", "type_annotation": "int", "default_value": "None"}],
+                    "docstring": "..."
+                }
+            ],
+            "classes": [
+                {
+                    "name": "ClassName",
+                    "start_line": 12,
+                    "end_line": 20,
+                    "content": "class ClassName...",
+                    "body": "...",
+                    "type": "class",
+                    "docstring": "..."
+                }
+            ],
+            "global_variables": [
+                {"name": "VAR", "type_annotation": "str", "value": "'val'"}
+            ],
+            "docstring": "Module docstring"
+        }
+        """
         
-    
-    def _parse_to_json(self, parsed_output:Dict[str, Any]) -> Dict[str, Any]:
-        logging.info(f"Output parsed to dictionary: {parsed_output}")
-        with open(f"./{os.path.splitext(self.file_name)[0]}.json", "w") as file:
-            json.dump(parsed_output, file)
-
-        return parsed_output
-    
-    async def parse_file(self) -> ModuleParser:
-        with open(self.file_path, "r", encoding="utf-8") as file:
-            content = file.read()
+        return f"""
+        You are an expert code parser. Your task is to analyze the following source code file named '{file_name}' and extract its structure into a JSON format.
         
-        out_parse = await self.parse(content)
+        Strictly follow this JSON schema structure:
+        {schema_hint}
         
-        self._parse_to_json(out_parse)
-
-        return out_parse
-
-    
-    async def parse_directory(self, directory_path:str) -> Dict[str, ModuleParser]:
-        parsed_files = {}
-        for root, _, files in os.walk(directory_path):
-            for file in files:
-                if file.endswith(tuple(self.DEFAULT_FILE_EXTENSIONS.keys())):
-                    file_path = os.path.join(root, file)
-                    parsed_files[file] = await self.parse_file(file_path=file_path)
+        Requirements:
+        1. Extract all imports, functions, classes, and global variables.
+        2. For functions and classes, provide PRECISE start_line and end_line (1-indexed).
+        3. Extract docstrings if available.
+        4. Capture the full content of the element in 'content'.
+        5. Capture the body content (excluding signature) in 'body'.
+        6. Extract parameters for functions.
+        7. The output MUST be valid JSON. Do not include markdown code block markers (```json ... ```).
         
-        return parsed_files
-    
-    
-# Usage Example
-parser = LLMCodeParser(file_path="/home/testys/Documents/GitHub/breeze_docs/src/code_parser/code_scanner.py")
+        Source Code:
+        {content}
+        """
 
-# Generate response
-async def main():
-    response = await parser.parse_file()
-    print(response)
+    def _parse_llm_response(self, response: str, file_path: str, raw_content: str) -> Optional[ModuleParser]:
+        # Clean up the response (remove markdown code blocks if present)
+        clean_response = response.strip()
+        if clean_response.startswith("```json"):
+            clean_response = clean_response[7:]
+        elif clean_response.startswith("```"):
+            clean_response = clean_response[3:]
+            
+        if clean_response.endswith("```"):
+            clean_response = clean_response[:-3]
+        
+        clean_response = clean_response.strip()
 
-asyncio.run(main())
+        try:
+            data = json.loads(clean_response)
+            
+            # Ensure file_path is set correctly (LLM might hallucinate it)
+            data['file_path'] = file_path
+            data['raw_content'] = raw_content
+            # Ensure name matches file name (or what LLM found)
+            if 'name' not in data:
+                 data['name'] = os.path.splitext(os.path.basename(file_path))[0]
+
+            # Validate with Pydantic
+            # Note: We need to be careful with optional fields in the schema.
+            # ModuleParser expects certain types. We rely on Pydantic's parsing.
+            module_parser = ModuleParser(**data)
+            return module_parser
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON response from LLM for {file_path}: {e}")
+            logger.debug(f"Raw response: {response}")
+            return None
+        except ValidationError as e:
+            logger.error(f"Pydantic validation failed for {file_path}: {e}")
+            logger.debug(f"Data: {data}")
+            return None

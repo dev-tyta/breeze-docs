@@ -10,3 +10,5 @@ langchain_anthropic
 pydantic
 langchain-google-genai
 PyGithub
+google-generativeai
+httpx

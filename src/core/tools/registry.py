@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 # Logging should be configured centrally by calling setup_logging() from src/utils/logging.py
 # in the application's entry point (e.g., main.py).
 
-
 class ToolRegistry:
     """
     A registry for managing and providing access to available tools.

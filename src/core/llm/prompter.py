@@ -96,6 +96,51 @@ Architecture Summary Requirements:
 - Mention important dependencies or external services.
 
 Format the output in Markdown.
+""",
+    "generate_project_readme": """
+Generate a high-quality, production-ready README.md for this project.
+
+Project Name: {project_name}
+
+List of Feature Highlights (Code Examples & Summaries):
+{feature_highlights}
+
+Project Structure Information:
+{project_structure}
+
+Structure:
+1.  **Header**: Project Name and a catchy tagline/description.
+2.  **Overview**: A compelling introduction to the project's purpose and goals.
+3.  **🔥 Key Features**: A bulleted list of 3-5 main capabilities.
+4.  **🚀 Installation**: Standard installation instructions (pip/git).
+5.  **📂 Project Structure**: A standard directory tree representation (`tree` command style).
+6.  **🏁 Feature Highlights**: Use the provided "List of Feature Highlights" to create this section. For each key component, show a *usage code snippet* first, followed by a brief 1-sentence explanation. This replaces bulky API documentation.
+7.  **🤝 Contributing**: Standard placeholder text for contributions.
+8.  **📄 License**: Standard Apache 2.0 or MIT license placeholder.
+
+Style Guidelines:
+- Use emojis in headers as shown above.
+- Focus on *showing* how it works (code-first) rather than *telling* (text-heavy).
+- Keep descriptions concise and marketing-friendly.
+- Markdown format.
+""",
+    "generate_feature_highlight": """
+Create a "Feature Highlight" for the following code element.
+This should be a clean, distinct usage example demonstrating the core value of this component.
+
+Code Element:
+```
+{code_snippet}
+```
+
+File Path: {file_path}
+
+Requirements:
+1.  **Title**: A short, action-oriented title (e.g., "Define a Single Agent", "Calculate Metrics").
+2.  **Code Block**: A self-contained, realistic Python code snippet showing how to initialize and use this component.
+3.  **Description**: A very brief (1-2 sentences) explanation of what the code does.
+
+Do NOT include parameter lists, return types tables, or dry technical details. Focus on USAGE.
 """
 }
 
@@ -217,6 +262,35 @@ class Prompter:
         return self._build_prompt(
             "summarize_architecture",
             structure_info=structure_info
+        )
+
+    def for_project_readme(self, project_name: str, feature_highlights: str, project_structure: str = "") -> str:
+        """
+        Builds a prompt for generating the top-level project README.
+
+        Args:
+            project_name: Name of the project.
+            feature_highlights: Consolidated text of feature highlights (code + summary).
+            project_structure: Textual representation of the project structure.
+
+        Returns:
+           The formatted prompt string.
+        """
+        return self._build_prompt(
+            "generate_project_readme",
+            project_name=project_name,
+            feature_highlights=feature_highlights,
+            project_structure=project_structure
+        )
+
+    def for_feature_highlight(self, code_snippet: str, file_path: str) -> str:
+        """
+        Builds a prompt for generating a feature highlight (usage example).
+        """
+        return self._build_prompt(
+            "generate_feature_highlight",
+            code_snippet=code_snippet,
+            file_path=file_path
         )
 
     # Add more methods here for other prompt types as needed

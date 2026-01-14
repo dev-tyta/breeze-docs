@@ -35,7 +35,7 @@ class LLMSettings(BaseSettings):
     # Maximum number of tokens for the LLM response.
     # Loaded from the environment variable BREE_LLM_MAX_TOKENS.
     max_tokens: int = Field(
-        4096, # Default max tokens
+        8192, # Default max tokens
         # Removed env="LLM_MAX_TOKENS" to rely on env_prefix="BREE_"
     )
 
@@ -68,8 +68,8 @@ class LLMSettings(BaseSettings):
     )
 
     # --- GitHub Authentication Settings ---
-    github_access_token: SecretStr = Field(
-        ..., # Optional GitHub access token
+    github_access_token: Optional[SecretStr] = Field(
+        None, # Optional GitHub access token
         # env="BREE_LLM_GITHUB_API_KEY
     )
 
@@ -123,6 +123,13 @@ class AppSettings(BaseSettings):
     # This will automatically load LLMSettings based on its own configuration.
     llm: LLMSettings = Field(default_factory=LLMSettings)
 
+    # GitHub Configuration
+    github_access_token: Optional[SecretStr] = Field(None, env="GITHUB_PERSONAL_ACCESS_TOKEN")
+    
+    # OAuth App Configuration (Optional, for "Login with GitHub")
+    github_client_id: Optional[str] = Field(None, env="GITHUB_CLIENT_ID")
+    github_client_secret: Optional[SecretStr] = Field(None, env="GITHUB_CLIENT_SECRET")
+    
     # Configuration for Pydantic Settings for the main AppSettings
     model_config = SettingsConfigDict(
         env_file=".env", # Optional: Load settings from a .env file

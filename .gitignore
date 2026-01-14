@@ -2,3 +2,5 @@
 __pycache__/
 data/
 *.json
+docs/
+dummy_test.py
